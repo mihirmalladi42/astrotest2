@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Astro Eyepiece Prototype</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="viewer">
+        <div class="live-frame">
+          <video id="camera" autoplay playsinline muted></video>
+          <img id="skyImage" alt="Resolved deep sky view from NASA SkyView" />
+          <canvas id="skyOverlay" aria-hidden="true"></canvas>
+          <div class="reticle" aria-hidden="true"></div>
+          <div class="target-dot" id="targetDot" aria-hidden="true"></div>
+          <div class="guide-arrows" aria-hidden="true">
+            <span id="guideUp" class="guide-arrow up">▲</span>
+            <span id="guideRight" class="guide-arrow right">▶</span>
+            <span id="guideDown" class="guide-arrow down">▼</span>
+            <span id="guideLeft" class="guide-arrow left">◀</span>
+          </div>
+          <div class="hud">
+            <span id="cameraStatus">Camera off</span>
+            <span id="pointingValue">Az 180.0 deg, Alt 45.0 deg</span>
+          </div>
+        </div>
+      </section>
+
+      <aside class="panel">
+        <div class="brand">
+          <span class="mark"></span>
+          <div>
+            <h1>Astro Eyepiece</h1>
+            <p>Point, capture, resolve.</p>
+          </div>
+        </div>
+
+        <div class="controls">
+          <button id="cameraToggle" type="button">Start Camera</button>
+          <button id="location" type="button">Use Location</button>
+          <button id="orientation" type="button">Use Orientation</button>
+          <button id="capture" type="button" class="primary">Resolve Sky</button>
+        </div>
+
+        <div class="target-panel">
+          <label>
+            Target Search
+            <input id="targetSearch" type="search" list="targetOptions" placeholder="M31, Orion Nebula, Pleiades..." />
+            <datalist id="targetOptions"></datalist>
+          </label>
+          <button id="targetSet" type="button">Set Target</button>
+          <p id="targetStatus" class="target-status">No target selected.</p>
+          <div class="toggles">
+            <label><input id="showObjects" type="checkbox" checked /> Deep-sky circles</label>
+            <label><input id="showConstellations" type="checkbox" checked /> Constellations</label>
+          </div>
+        </div>
+
+        <div class="grid">
+          <label>
+            Latitude
+            <input id="latitude" type="number" step="0.000001" />
+          </label>
+          <label>
+            Longitude
+            <input id="longitude" type="number" step="0.000001" />
+          </label>
+          <label>
+            Azimuth
+            <input id="azimuth" type="number" min="0" max="360" step="0.1" />
+          </label>
+          <label>
+            Altitude
+            <input id="altitude" type="number" min="-5" max="90" step="0.1" />
+          </label>
+          <label>
+            Field
+            <input id="fieldOfView" type="number" min="0.2" max="8" step="0.1" />
+          </label>
+          <label>
+            Survey
+            <select id="survey">
+              <option>DSS</option>
+              <option selected>DSS2 Red</option>
+              <option>DSS2 Blue</option>
+              <option>2MASS-K</option>
+              <option>WISE 12</option>
+              <option>GALEX Near UV</option>
+            </select>
+          </label>
+        </div>
+
+        <dl class="telemetry">
+          <div><dt>RA</dt><dd><span id="raValue"></span><small id="raHms"></small></dd></div>
+          <div><dt>Dec</dt><dd><span id="decValue"></span><small id="decDms"></small></dd></div>
+          <div><dt>Guide</dt><dd><span id="guideValue">No target</span><small id="guideHint">Search for a target.</small></dd></div>
+          <div><dt>LST</dt><dd><span id="lstValue"></span></dd></div>
+        </dl>
+
+        <p id="status" class="status">Ready.</p>
+        <a id="imageLink" href="https://skyview.gsfc.nasa.gov/current/cgi/query.pl" target="_blank" rel="noreferrer">Open returned image</a>
+      </aside>
+    </main>
+
+    <script src="catalog.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
