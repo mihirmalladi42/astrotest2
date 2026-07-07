@@ -16,7 +16,7 @@ const state = {
 
 const $ = (id) => document.getElementById(id);
 const catalog = window.ASTRO_CATALOG || { objects: [], constellations: [] };
-const LIVE_VIEW_HORIZONTAL_FOV_DEG = 70;
+const LIVE_VIEW_HORIZONTAL_FOV_DEG = 95;
 
 const degToRad = (deg) => (deg * Math.PI) / 180;
 const radToDeg = (rad) => (rad * 180) / Math.PI;
@@ -185,7 +185,7 @@ function projectAltAzToLiveFrame(azDeg, altDeg, canvas, { allowMargin = false } 
   const verticalFov = horizontalFov * (canvas.height / canvas.width);
   const dxDeg = signedDeltaDeg(azDeg, state.az) * Math.cos(degToRad(state.alt));
   const dyDeg = altDeg - state.alt;
-  const x = canvas.width / 2 + (dxDeg / horizontalFov) * canvas.width;
+  const x = canvas.width / 2 - (dxDeg / horizontalFov) * canvas.width;
   const y = canvas.height / 2 - (dyDeg / verticalFov) * canvas.height;
   const margin = allowMargin ? 40 * (window.devicePixelRatio || 1) : 0;
   if (x < -margin || x > canvas.width + margin || y < -margin || y > canvas.height + margin) return null;
@@ -198,7 +198,7 @@ function projectAltAzToLivePercent(azDeg, altDeg) {
   const dxDeg = signedDeltaDeg(azDeg, state.az) * Math.cos(degToRad(state.alt));
   const dyDeg = altDeg - state.alt;
   return {
-    x: 50 + (dxDeg / horizontalFov) * 100,
+    x: 50 - (dxDeg / horizontalFov) * 100,
     y: 50 - (dyDeg / verticalFov) * 100,
   };
 }
@@ -501,7 +501,7 @@ function updateGuide(coords) {
     : `Move: ${deltaAz > 0 ? "right" : "left"} ${Math.abs(deltaAz).toFixed(1)} deg, ${deltaAlt > 0 ? "up" : "down"} ${Math.abs(deltaAlt).toFixed(1)} deg`;
 
   if (!isBelowHorizon && !isCentered) {
-    const arrowAngle = radToDeg(Math.atan2(deltaAz, deltaAlt));
+    const arrowAngle = radToDeg(Math.atan2(-deltaAz, deltaAlt));
     guideArrow.style.transform = `translate(-50%, -50%) rotate(${arrowAngle}deg)`;
     guideArrow.classList.add("visible");
   }
