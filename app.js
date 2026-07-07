@@ -117,14 +117,14 @@ function decDegToDms(decDeg) {
   return `${sign}${String(d).padStart(2, "0")}d ${String(m).padStart(2, "0")}m ${s.toFixed(0).padStart(2, "0")}s`;
 }
 
-function angleDegToHmsLabel(angleDeg, { signed = false } = {}) {
+function angleDegToDms(angleDeg, { signed = false } = {}) {
   const normalized = signed ? angleDeg : wrap360(angleDeg);
   const sign = signed && normalized >= 0 ? "+" : normalized < 0 ? "-" : "";
   const totalSeconds = Math.round(Math.abs(normalized) * 3600);
-  const h = Math.floor(totalSeconds / 3600);
+  const d = Math.floor(totalSeconds / 3600);
   const m = Math.floor((totalSeconds % 3600) / 60);
   const s = totalSeconds % 60;
-  return `${sign}${String(h).padStart(3, "0")}h ${String(m).padStart(2, "0")}m ${String(s).padStart(2, "0")}s`;
+  return `${sign}${String(d).padStart(3, "0")}d ${String(m).padStart(2, "0")}m ${String(s).padStart(2, "0")}s`;
 }
 
 function skyViewUrl(raDeg, decDeg) {
@@ -243,7 +243,7 @@ function updateTelemetry(coords) {
   $("raHms").textContent = raDegToHms(coords.raDeg);
   $("decDms").textContent = decDegToDms(coords.decDeg);
   $("lstValue").textContent = `${coords.lstDeg.toFixed(3)} deg`;
-  $("pointingValue").textContent = `Az ${angleDegToHmsLabel(state.az)}, Alt ${angleDegToHmsLabel(state.alt, { signed: true })}`;
+  $("pointingValue").textContent = `Az ${angleDegToDms(state.az)}, Alt ${angleDegToDms(state.alt, { signed: true })}`;
 }
 
 function updateGuide(coords) {
