@@ -405,6 +405,9 @@ function updateGuide(coords) {
     latDeg: state.lat,
     lonDeg: state.lon,
   });
+  $("targetStatus").textContent =
+    `${state.target.id}: ${state.target.name} (${state.target.type}) | ` +
+    `RA ${raDegToHms(targetCoords.raDeg)}, Dec ${decDegToDms(targetCoords.decDeg)}`;
   const targetOffset = targetScreenPosition(targetAltAz);
   const screenDistance = Math.hypot(targetOffset.rightAngle, targetOffset.upAngle);
   const centerThreshold = Math.max(2, state.fov * 0.5);

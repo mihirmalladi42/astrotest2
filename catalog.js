@@ -1,6 +1,6 @@
 window.ASTRO_CATALOG = {
   objects: [
-    { id: "M31", name: "Andromeda Galaxy", type: "Galaxy", ra: 10.6847, dec: 41.2690, size: 3.1 },
+    { id: "M31", name: "Andromeda Galaxy", type: "Galaxy", ra: 10.684708, dec: 41.268750, size: 3.1 },
     { id: "M42", name: "Orion Nebula", type: "Nebula", ra: 83.8221, dec: -5.3911, size: 1.1 },
     { id: "M45", name: "Pleiades", type: "Open cluster", ra: 56.7500, dec: 24.1167, size: 1.8 },
     { id: "M13", name: "Hercules Globular Cluster", type: "Globular cluster", ra: 250.4235, dec: 36.4613, size: 0.35 },
@@ -30,7 +30,7 @@ window.ASTRO_CATALOG = {
     { id: "NGC 869", name: "Double Cluster West", type: "Open cluster", ra: 34.7500, dec: 57.1333, size: 0.5 },
     { id: "NGC 884", name: "Double Cluster East", type: "Open cluster", ra: 35.5500, dec: 57.1500, size: 0.5 },
     { id: "NGC 1976", name: "Orion Nebula", type: "Nebula", ra: 83.8221, dec: -5.3911, size: 1.1 },
-    { id: "NGC 224", name: "Andromeda Galaxy", type: "Galaxy", ra: 10.6847, dec: 41.2690, size: 3.1 },
+    { id: "NGC 224", name: "Andromeda Galaxy", type: "Galaxy", ra: 10.684708, dec: 41.268750, size: 3.1 },
     { id: "NGC 253", name: "Sculptor Galaxy", type: "Galaxy", ra: 11.8880, dec: -25.2880, size: 0.45 },
     { id: "NGC 3372", name: "Carina Nebula", type: "Nebula", ra: 161.2650, dec: -59.6840, size: 2.0 },
     { id: "NGC 4038", name: "Antennae Galaxies", type: "Galaxy", ra: 180.4708, dec: -18.8676, size: 0.09 },
