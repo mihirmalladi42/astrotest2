@@ -366,13 +366,42 @@ function useLocation() {
 }
 
 function enableOrientation() {
-  const handle = (event) => {
-    if (typeof event.alpha === "number") {
-      state.az = wrap360(360 - event.alpha);
-      $("azimuth").value = state.az.toFixed(1);
+  const getCameraPointing = (event) => {
+    if (![event.alpha, event.beta, event.gamma].every((value) => typeof value === "number")) {
+      return null;
     }
-    if (typeof event.beta === "number") {
-      state.alt = Math.max(-5, Math.min(90, event.beta));
+
+    const alpha = degToRad(event.webkitCompassHeading ?? event.alpha);
+    const beta = degToRad(event.beta);
+    const gamma = degToRad(event.gamma);
+    const cA = Math.cos(alpha);
+    const sA = Math.sin(alpha);
+    const cB = Math.cos(beta);
+    const sB = Math.sin(beta);
+    const cG = Math.cos(gamma);
+    const sG = Math.sin(gamma);
+
+    const m13 = cA * sG + cG * sA * sB;
+    const m23 = sA * sG - cA * cG * sB;
+    const m33 = cB * cG;
+
+    // Browser orientation describes the phone body. The back camera points
+    // through the negative device Z axis, so use the negative third column.
+    const east = -m13;
+    const north = -m23;
+    const up = -m33;
+    return {
+      azDeg: wrap360(radToDeg(Math.atan2(east, north))),
+      altDeg: radToDeg(Math.asin(Math.max(-1, Math.min(1, up)))),
+    };
+  };
+
+  const handle = (event) => {
+    const pointing = getCameraPointing(event);
+    if (pointing) {
+      state.az = pointing.azDeg;
+      state.alt = Math.max(-90, Math.min(90, pointing.altDeg));
+      $("azimuth").value = state.az.toFixed(1);
       $("altitude").value = state.alt.toFixed(1);
     }
     solvePointing();
