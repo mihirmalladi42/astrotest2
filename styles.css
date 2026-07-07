@@ -193,6 +193,30 @@ video {
   opacity: 1;
 }
 
+.live-guide-text {
+  position: absolute;
+  z-index: 6;
+  left: 50%;
+  top: calc(50% + 62px);
+  min-width: 160px;
+  padding: 7px 10px;
+  border: 1px solid rgba(255, 202, 95, 0.55);
+  border-radius: 6px;
+  background: rgba(8, 10, 13, 0.74);
+  color: var(--accent-strong);
+  font-size: 13px;
+  line-height: 1.25;
+  text-align: center;
+  transform: translateX(-50%);
+  text-shadow: 0 1px 2px #000;
+  pointer-events: none;
+}
+
+.live-guide-text.on-target {
+  border-color: rgba(104, 210, 198, 0.75);
+  color: var(--accent);
+}
+
 .panel {
   padding: 24px;
   border-left: 1px solid var(--line);

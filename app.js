@@ -16,6 +16,7 @@ const state = {
 
 const $ = (id) => document.getElementById(id);
 const catalog = window.ASTRO_CATALOG || { objects: [], constellations: [] };
+const LIVE_VIEW_HORIZONTAL_FOV_DEG = 70;
 
 const degToRad = (deg) => (deg * Math.PI) / 180;
 const radToDeg = (rad) => (rad * 180) / Math.PI;
@@ -179,29 +180,59 @@ function sizeCanvasToDisplay(canvas) {
   }
 }
 
+function projectAltAzToLiveFrame(azDeg, altDeg, canvas, { allowMargin = false } = {}) {
+  const horizontalFov = LIVE_VIEW_HORIZONTAL_FOV_DEG;
+  const verticalFov = horizontalFov * (canvas.height / canvas.width);
+  const dxDeg = signedDeltaDeg(azDeg, state.az) * Math.cos(degToRad(state.alt));
+  const dyDeg = altDeg - state.alt;
+  const x = canvas.width / 2 + (dxDeg / horizontalFov) * canvas.width;
+  const y = canvas.height / 2 - (dyDeg / verticalFov) * canvas.height;
+  const margin = allowMargin ? 40 * (window.devicePixelRatio || 1) : 0;
+  if (x < -margin || x > canvas.width + margin || y < -margin || y > canvas.height + margin) return null;
+  return { x, y, dxDeg, dyDeg };
+}
+
+function projectAltAzToLivePercent(azDeg, altDeg) {
+  const horizontalFov = LIVE_VIEW_HORIZONTAL_FOV_DEG;
+  const verticalFov = horizontalFov * 0.75;
+  const dxDeg = signedDeltaDeg(azDeg, state.az) * Math.cos(degToRad(state.alt));
+  const dyDeg = altDeg - state.alt;
+  return {
+    x: 50 + (dxDeg / horizontalFov) * 100,
+    y: 50 - (dyDeg / verticalFov) * 100,
+  };
+}
+
 function drawSkyOverlay() {
   sizeOverlayCanvas();
   const canvas = $("skyOverlay");
   const ctx = canvas.getContext("2d");
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  if (!state.centerCoords) return;
 
   const showConstellations = $("showConstellations")?.checked;
   const showObjects = $("showObjects")?.checked;
-  ctx.lineWidth = 1.5 * (window.devicePixelRatio || 1);
-  ctx.font = `${12 * (window.devicePixelRatio || 1)}px system-ui, sans-serif`;
+  const ratio = window.devicePixelRatio || 1;
+  ctx.lineWidth = 1.5 * ratio;
+  ctx.font = `${12 * ratio}px system-ui, sans-serif`;
 
   if (showConstellations) {
     ctx.strokeStyle = "rgba(104, 210, 198, 0.55)";
     ctx.fillStyle = "rgba(104, 210, 198, 0.78)";
     catalog.constellations.forEach((constellation) => {
       let labelPoint = null;
+      const starPositions = {};
+      Object.entries(constellation.stars).forEach(([name, star]) => {
+        const altAz = equatorialToHorizontal({
+          raDeg: star[0],
+          decDeg: star[1],
+          latDeg: state.lat,
+          lonDeg: state.lon,
+        });
+        starPositions[name] = projectAltAzToLiveFrame(altAz.azDeg, altAz.altDeg, canvas, { allowMargin: true });
+      });
       constellation.lines.forEach(([from, to]) => {
-        const a = constellation.stars[from];
-        const b = constellation.stars[to];
-        if (!a || !b) return;
-        const pa = projectToFrame(a[0], a[1]);
-        const pb = projectToFrame(b[0], b[1]);
+        const pa = starPositions[from];
+        const pb = starPositions[to];
         if (!pa || !pb) return;
         ctx.beginPath();
         ctx.moveTo(pa.x, pa.y);
@@ -215,11 +246,16 @@ function drawSkyOverlay() {
 
   if (showObjects) {
     catalog.objects.forEach((object) => {
-      const distance = angularDistanceDeg(state.centerCoords.raDeg, state.centerCoords.decDeg, object.ra, object.dec);
-      if (distance > state.fov * 0.85) return;
-      const point = projectToFrame(object.ra, object.dec);
+      const altAz = equatorialToHorizontal({
+        raDeg: object.ra,
+        decDeg: object.dec,
+        latDeg: state.lat,
+        lonDeg: state.lon,
+      });
+      if (altAz.altDeg < 0) return;
+      const point = projectAltAzToLiveFrame(altAz.azDeg, altAz.altDeg, canvas);
       if (!point) return;
-      const radius = Math.max(10, Math.min(34, (object.size / state.fov) * canvas.width * 0.5));
+      const radius = object === state.target ? 16 * ratio : 8 * ratio;
       ctx.strokeStyle = object === state.target ? "rgba(255, 202, 95, 0.98)" : "rgba(255, 202, 95, 0.78)";
       ctx.fillStyle = ctx.strokeStyle;
       ctx.beginPath();
@@ -411,7 +447,9 @@ function updateCaptureMetadata(coords, capturedAt = new Date()) {
 
 function updateGuide(coords) {
   const guideArrow = $("guideArrow");
+  const liveGuideText = $("liveGuideText");
   guideArrow.classList.remove("visible");
+  liveGuideText.classList.remove("on-target");
   $("targetDot").style.opacity = 0;
 
   if (!state.target) {
@@ -421,6 +459,7 @@ function updateGuide(coords) {
     $("targetLock").classList.remove("on-target");
     $("targetAltAz").textContent = "Target: --";
     $("deltaAltAz").textContent = "Move: --";
+    liveGuideText.textContent = "Search target";
     return;
   }
 
@@ -450,6 +489,12 @@ function updateGuide(coords) {
     ? `${state.target.id} is below the horizon`
     : `Guide to ${state.target.id}: ${deltaAz > 0 ? "turn right" : "turn left"}, ${deltaAlt > 0 ? "tilt up" : "tilt down"}`;
   $("targetLock").classList.toggle("on-target", isCentered);
+  liveGuideText.classList.toggle("on-target", isCentered);
+  liveGuideText.textContent = isCentered
+    ? `ON TARGET ${state.target.id}`
+    : isBelowHorizon
+    ? `${state.target.id} below horizon`
+    : `${deltaAz > 0 ? "RIGHT" : "LEFT"} ${Math.abs(deltaAz).toFixed(1)} deg / ${deltaAlt > 0 ? "UP" : "DOWN"} ${Math.abs(deltaAlt).toFixed(1)} deg`;
   $("targetAltAz").textContent = `Target: Alt ${angleDegToDms(targetAltAz.altDeg, { signed: true })}, Az ${angleDegToDms(targetAltAz.azDeg)}`;
   $("deltaAltAz").textContent = isCentered
     ? "Move: centered"
@@ -462,13 +507,12 @@ function updateGuide(coords) {
   }
 
   const dot = $("targetDot");
-  const frame = $("skyOverlay");
-  const x = 50 + (deltaAz / Math.max(state.fov, 1)) * 35;
-  const y = 50 - (deltaAlt / Math.max(state.fov, 1)) * 35;
+  const livePoint = projectAltAzToLivePercent(targetAltAz.azDeg, targetAltAz.altDeg);
+  const x = livePoint.x;
+  const y = livePoint.y;
   dot.style.left = `${Math.max(8, Math.min(92, x))}%`;
   dot.style.top = `${Math.max(8, Math.min(92, y))}%`;
   dot.style.opacity = isBelowHorizon ? 0 : 1;
-  frame.dataset.targetDistance = String(distance);
   void coords;
 }
 
