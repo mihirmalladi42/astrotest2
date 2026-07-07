@@ -12,6 +12,7 @@ const state = {
   cameraReady: false,
   centerCoords: null,
   target: null,
+  phonePointing: null,
   guideAzDirection: 0,
   guideTargetId: null,
 };
@@ -355,7 +356,7 @@ function showCaptureToast(coords) {
   const toast = $("captureToast");
   if (!toast) return;
   toast.textContent =
-    `Taken picture at Alt: ${angleDegToDms(state.alt, { signed: true })}, Az: ${angleDegToDms(state.az)}\n` +
+    `Phone orientation capture at Alt: ${angleDegToDms(state.alt, { signed: true })}, Az: ${angleDegToDms(state.az)}\n` +
     `RA: ${raDegToHms(coords.raDeg)}, Dec: ${decDegToDms(coords.decDeg)}`;
   toast.classList.add("visible");
   clearTimeout(showCaptureToast.hideTimer);
@@ -369,6 +370,7 @@ function updateCaptureMetadata(coords, capturedAt = new Date()) {
   if (!metadata) return;
   metadata.textContent =
     `Time (UTC): ${capturedAt.toISOString()}\n` +
+    `Source: phone orientation sensor\n` +
     `RA: ${raDegToHms(coords.raDeg)}, Dec: ${decDegToDms(coords.decDeg)}\n` +
     `Alt: ${angleDegToDms(state.alt, { signed: true })}, Az: ${angleDegToDms(state.az)}\n` +
     `Coordinates: ${state.lat.toFixed(6)}, ${state.lon.toFixed(6)}`;
@@ -459,19 +461,48 @@ function solvePointing() {
   return coords;
 }
 
+function freshPhonePointing(maxAgeMs = 5000) {
+  if (!state.phonePointing) return null;
+  const ageMs = Date.now() - state.phonePointing.timestamp;
+  return ageMs <= maxAgeMs ? state.phonePointing : null;
+}
+
 function captureSky() {
   const capturedAt = new Date();
-  const coords = solvePointing();
+  const phonePointing = freshPhonePointing();
+  if (!phonePointing) {
+    $("status").textContent = "Resolve blocked: enable orientation and point the phone at the sky. Capture only uses fresh phone orientation.";
+    $("cameraStatus").textContent = "Orientation required";
+    return;
+  }
+
+  state.az = phonePointing.azDeg;
+  state.alt = phonePointing.altDeg;
+  $("azimuth").value = state.az.toFixed(1);
+  $("altitude").value = state.alt.toFixed(1);
+
+  const coords = horizontalToEquatorial({
+    azDeg: phonePointing.azDeg,
+    altDeg: phonePointing.altDeg,
+    latDeg: state.lat,
+    lonDeg: state.lon,
+    date: capturedAt,
+  });
   const url = skyViewUrl(coords.raDeg, coords.decDeg);
   const image = $("skyImage");
   image.src = url;
   image.addEventListener("load", drawSkyOverlay, { once: true });
   state.centerCoords = coords;
+  updateTelemetry(coords);
+  updateGuide(coords);
   drawSkyOverlay();
   showCaptureToast(coords);
   updateCaptureMetadata(coords, capturedAt);
   $("imageLink").href = url;
-  $("status").textContent = `Requested ${state.survey} at RA ${coords.raDeg.toFixed(4)} deg, Dec ${coords.decDeg.toFixed(4)} deg`;
+  $("status").textContent =
+    `Requested ${state.survey} from PHONE ORIENTATION ONLY: ` +
+    `Az ${phonePointing.azDeg.toFixed(1)} deg, Alt ${phonePointing.altDeg.toFixed(1)} deg; ` +
+    `RA ${coords.raDeg.toFixed(4)} deg, Dec ${coords.decDeg.toFixed(4)} deg`;
 }
 
 async function startCamera() {
@@ -605,6 +636,11 @@ function enableOrientation() {
     if (pointing) {
       state.az = pointing.azDeg;
       state.alt = Math.max(-90, Math.min(90, pointing.altDeg));
+      state.phonePointing = {
+        azDeg: state.az,
+        altDeg: state.alt,
+        timestamp: Date.now(),
+      };
       $("azimuth").value = state.az.toFixed(1);
       $("altitude").value = state.alt.toFixed(1);
     }
