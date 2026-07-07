@@ -227,11 +227,68 @@ function sizeOverlayCanvas() {
 }
 
 
+function targetScreenPosition(targetAltAz) {
+  const canvas = $("skyOverlay");
+  const aspect = canvas.width / canvas.height;
+  const verticalFov = Math.max(0.2, state.fov);
+  const horizontalFov = verticalFov * aspect;
+  const deltaAz = signedDeltaDeg(targetAltAz.azDeg, state.az);
+  const deltaAlt = targetAltAz.altDeg - state.alt;
+  const screenDeltaAz = deltaAz * Math.cos(degToRad(state.alt));
+
+  return {
+    x: canvas.width / 2 + (screenDeltaAz / horizontalFov) * canvas.width,
+    y: canvas.height / 2 - (deltaAlt / verticalFov) * canvas.height,
+    deltaAz,
+    deltaAlt,
+    horizontalFov,
+    verticalFov,
+  };
+}
+
+function drawTargetFrame(ctx, targetAltAz) {
+  if (targetAltAz.altDeg < 0) return;
+
+  const canvas = $("skyOverlay");
+  const projected = targetScreenPosition(targetAltAz);
+  const frameSide = Math.min(canvas.width, canvas.height) * 0.7;
+  const halfSide = frameSide / 2;
+  const left = projected.x - halfSide;
+  const top = projected.y - halfSide;
+
+  ctx.save();
+  ctx.strokeStyle = "rgba(104, 210, 198, 0.85)";
+  ctx.lineWidth = 3;
+  ctx.setLineDash([12, 10]);
+  ctx.strokeRect(left, top, frameSide, frameSide);
+  ctx.setLineDash([]);
+
+  ctx.beginPath();
+  ctx.arc(projected.x, projected.y, 6, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(104, 210, 198, 0.95)";
+  ctx.fill();
+  ctx.restore();
+}
+
 function drawSkyOverlay() {
   sizeOverlayCanvas();
   const canvas = $("skyOverlay");
   const ctx = canvas.getContext("2d");
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  if (!state.target) return;
+
+  const targetCoords = objectEquatorial(state.target);
+  if (!targetCoords) return;
+
+  const targetAltAz = equatorialToHorizontal({
+    raDeg: targetCoords.raDeg,
+    decDeg: targetCoords.decDeg,
+    latDeg: state.lat,
+    lonDeg: state.lon,
+  });
+
+  drawTargetFrame(ctx, targetAltAz);
 }
 
 function syncInputsFromState() {
@@ -324,16 +381,16 @@ function updateGuide(coords) {
 
   const azThreshold = 0.7;
   const altThreshold = 0.7;
-  const horizontalDirection = deltaAz > azThreshold ? "right" : deltaAz < -azThreshold ? "left" : "center";
-  const verticalDirection = deltaAlt > altThreshold ? "up" : deltaAlt < -altThreshold ? "down" : "center";
-  const horizontalText = horizontalDirection === "center" ? "" : `${horizontalDirection} ${Math.abs(deltaAz).toFixed(1)}°`;
-  const verticalText = verticalDirection === "center" ? "" : `${verticalDirection} ${Math.abs(deltaAlt).toFixed(1)}°`;
+  const azAction = deltaAz > azThreshold ? "right" : deltaAz < -azThreshold ? "left" : "center";
+  const altAction = deltaAlt > altThreshold ? "up" : deltaAlt < -altThreshold ? "down" : "center";
+  const horizontalText = azAction === "center" ? "" : `${azAction} ${Math.abs(deltaAz).toFixed(1)}°`;
+  const verticalText = altAction === "center" ? "" : `${altAction} ${Math.abs(deltaAlt).toFixed(1)}°`;
   const moveText = [horizontalText, verticalText].filter(Boolean).join(" / ") || "centered";
 
   $("guideValue").textContent = `${state.target.id}: ${screenDistance.toFixed(1)} deg away`;
   $("guideHint").textContent = isCentered
     ? "Target centered. Resolve sky for detail."
-    : `Point ${moveText}.`;
+    : "Align the reticle with the target frame.";
   $("targetLock").textContent = isCentered
     ? `ON TARGET: ${state.target.id}`
     : `Guide to ${state.target.id}: ${moveText}`;
@@ -347,6 +404,14 @@ function updateGuide(coords) {
 
   const arrowIcon = isCentered
     ? "◎"
+    : azAction === "center"
+    ? altAction === "up"
+      ? "↑"
+      : "↓"
+    : altAction === "center"
+    ? azAction === "right"
+      ? "→"
+      : "←"
     : Math.abs(deltaAz) >= Math.abs(deltaAlt)
     ? deltaAz > 0
       ? "→"
