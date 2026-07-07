@@ -12,6 +12,8 @@ const state = {
   cameraReady: false,
   centerCoords: null,
   target: null,
+  guideAzDirection: 0,
+  guideTargetId: null,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -33,6 +35,7 @@ const signedDeltaDeg = (toDeg, fromDeg) => {
   const delta = wrap360(toDeg - fromDeg);
   return delta > 180 ? delta - 360 : delta;
 };
+const signOrZero = (value) => (value > 0 ? 1 : value < 0 ? -1 : 0);
 
 function julianDate(date = new Date()) {
   return date.getTime() / 86400000 + 2440587.5;
@@ -226,13 +229,41 @@ function sizeOverlayCanvas() {
   }
 }
 
+function stableGuideAzDelta(rawDeltaAz, targetId) {
+  if (state.guideTargetId !== targetId) {
+    state.guideTargetId = targetId;
+    state.guideAzDirection = 0;
+  }
+
+  const rawDirection = signOrZero(rawDeltaAz);
+  const absDelta = Math.abs(rawDeltaAz);
+  const lockThreshold = 135;
+  const releaseThreshold = 105;
+
+  if (absDelta >= lockThreshold && state.guideAzDirection !== 0) {
+    return state.guideAzDirection * absDelta;
+  }
+
+  if (absDelta <= releaseThreshold || state.guideAzDirection === 0) {
+    state.guideAzDirection = rawDirection;
+    return rawDeltaAz;
+  }
+
+  if (rawDirection !== 0 && rawDirection !== state.guideAzDirection) {
+    return state.guideAzDirection * absDelta;
+  }
+
+  state.guideAzDirection = rawDirection;
+  return rawDeltaAz;
+}
+
 function targetScreenPosition(targetAltAz) {
   sizeOverlayCanvas();
   const canvas = $("skyOverlay");
   const aspect = canvas.width / canvas.height;
   const verticalFov = Math.max(0.2, state.fov);
   const horizontalFov = verticalFov * aspect;
-  const deltaAz = signedDeltaDeg(targetAltAz.azDeg, state.az);
+  const deltaAz = stableGuideAzDelta(signedDeltaDeg(targetAltAz.azDeg, state.az), state.target?.id);
   const deltaAlt = targetAltAz.altDeg - state.alt;
   const rightAngle = deltaAz * Math.cos(degToRad(state.alt));
   const upAngle = deltaAlt;
@@ -348,6 +379,8 @@ function updateGuide(coords) {
   liveGuideText.classList.remove("on-target");
 
   if (!state.target) {
+    state.guideTargetId = null;
+    state.guideAzDirection = 0;
     $("guideValue").textContent = "No target";
     $("guideHint").textContent = "Choose a target.";
     $("targetLock").textContent = "Choose a target to start guidance.";
@@ -659,11 +692,15 @@ function setTarget() {
   const target = catalog.objects.find((object) => object.id === selectedId);
   if (!target) {
     state.target = null;
+    state.guideTargetId = null;
+    state.guideAzDirection = 0;
     $("targetStatus").textContent = "No target selected.";
     solvePointing();
     return;
   }
   state.target = target;
+  state.guideTargetId = null;
+  state.guideAzDirection = 0;
   $("targetStatus").textContent = `${target.id}: ${target.name} (${target.type})`;
   solvePointing();
 }
