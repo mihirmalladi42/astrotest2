@@ -5,14 +5,14 @@ This is a first-pass software and industrial-design prototype for a handheld ast
 ## What it does
 
 - Shows a live camera preview when the browser permits camera access.
+- Captures the current live phone camera frame as the photo.
 - Takes manual or sensor-sourced pointing values: azimuth and altitude.
 - Uses the user's latitude and longitude.
 - Converts horizontal coordinates to J2000-style RA/Dec for the current time.
-- Sends the coordinate to NASA SkyView, a free no-key survey cutout service.
-- Places the returned sky image back into the live-view frame.
+- Can build a NASA SkyView survey cutout URL for the current pointing.
 - Searches a built-in beginner target catalog by Messier/NGC/common name.
 - Guides the user toward a selected target with arrows and a target dot.
-- Draws deep-sky object circles and simplified constellation lines over the returned sky image.
+- Draws the target guide over the live or captured camera view.
 
 ## Prototype files
 

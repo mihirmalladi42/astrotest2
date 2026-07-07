@@ -266,7 +266,7 @@ function targetScreenPosition(targetAltAz) {
   const horizontalFov = verticalFov * aspect;
   const deltaAz = stableGuideAzDelta(signedDeltaDeg(targetAltAz.azDeg, state.az), state.target?.id);
   const deltaAlt = targetAltAz.altDeg - state.alt;
-  const rightAngle = -deltaAz * Math.cos(degToRad(state.alt));
+  const rightAngle = deltaAz * Math.cos(degToRad(state.alt));
   const upAngle = deltaAlt;
 
   return {
@@ -355,9 +355,10 @@ function updateTelemetry(coords) {
 function showCaptureToast(coords) {
   const toast = $("captureToast");
   if (!toast) return;
-  toast.textContent =
-    `Phone orientation capture at Alt: ${angleDegToDms(state.alt, { signed: true })}, Az: ${angleDegToDms(state.az)}\n` +
-    `RA: ${raDegToHms(coords.raDeg)}, Dec: ${decDegToDms(coords.decDeg)}`;
+  toast.textContent = coords
+    ? `Camera photo captured at Alt: ${angleDegToDms(state.alt, { signed: true })}, Az: ${angleDegToDms(state.az)}\n` +
+      `RA: ${raDegToHms(coords.raDeg)}, Dec: ${decDegToDms(coords.decDeg)}`
+    : "Camera photo captured.";
   toast.classList.add("visible");
   clearTimeout(showCaptureToast.hideTimer);
   showCaptureToast.hideTimer = setTimeout(() => {
@@ -368,12 +369,15 @@ function showCaptureToast(coords) {
 function updateCaptureMetadata(coords, capturedAt = new Date()) {
   const metadata = $("captureMetadata");
   if (!metadata) return;
+  const pointingText = coords
+    ? `RA: ${raDegToHms(coords.raDeg)}, Dec: ${decDegToDms(coords.decDeg)}\n` +
+      `Alt: ${angleDegToDms(state.alt, { signed: true })}, Az: ${angleDegToDms(state.az)}\n` +
+      `Coordinates: ${state.lat.toFixed(6)}, ${state.lon.toFixed(6)}`
+    : "Pointing: unavailable";
   metadata.textContent =
     `Time (UTC): ${capturedAt.toISOString()}\n` +
-    `Source: phone orientation sensor\n` +
-    `RA: ${raDegToHms(coords.raDeg)}, Dec: ${decDegToDms(coords.decDeg)}\n` +
-    `Alt: ${angleDegToDms(state.alt, { signed: true })}, Az: ${angleDegToDms(state.az)}\n` +
-    `Coordinates: ${state.lat.toFixed(6)}, ${state.lon.toFixed(6)}`;
+    `Source: phone camera frame\n` +
+    pointingText;
 }
 
 function updateGuide(coords) {
@@ -467,30 +471,49 @@ function freshPhonePointing(maxAgeMs = 5000) {
   return ageMs <= maxAgeMs ? state.phonePointing : null;
 }
 
+function captureCameraFrame() {
+  const video = $("camera");
+  if (!state.cameraReady || !video.srcObject) return null;
+  if (!video.videoWidth || !video.videoHeight) return null;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL("image/jpeg", 0.92);
+}
+
 function captureSky() {
   const capturedAt = new Date();
-  const phonePointing = freshPhonePointing();
-  if (!phonePointing) {
-    $("status").textContent = "Resolve blocked: enable orientation and point the phone at the sky. Capture only uses fresh phone orientation.";
-    $("cameraStatus").textContent = "Orientation required";
+  const photoUrl = captureCameraFrame();
+  if (!photoUrl) {
+    $("status").textContent = "Photo blocked: start the camera and wait for the live preview before capturing.";
+    $("cameraStatus").textContent = "Camera required";
     return;
   }
 
-  state.az = phonePointing.azDeg;
-  state.alt = phonePointing.altDeg;
-  $("azimuth").value = state.az.toFixed(1);
-  $("altitude").value = state.alt.toFixed(1);
+  const phonePointing = freshPhonePointing();
+  if (phonePointing) {
+    state.az = phonePointing.azDeg;
+    state.alt = phonePointing.altDeg;
+    $("azimuth").value = state.az.toFixed(1);
+    $("altitude").value = state.alt.toFixed(1);
+  } else {
+    readInputs();
+  }
 
-  const coords = horizontalToEquatorial({
-    azDeg: phonePointing.azDeg,
-    altDeg: phonePointing.altDeg,
-    latDeg: state.lat,
-    lonDeg: state.lon,
-    date: capturedAt,
-  });
-  const url = skyViewUrl(coords.raDeg, coords.decDeg);
+  const coords = phonePointing
+    ? horizontalToEquatorial({
+        azDeg: phonePointing.azDeg,
+        altDeg: phonePointing.altDeg,
+        latDeg: state.lat,
+        lonDeg: state.lon,
+        date: capturedAt,
+      })
+    : solvePointing();
   const image = $("skyImage");
-  image.src = url;
+  image.src = photoUrl;
   image.addEventListener("load", drawSkyOverlay, { once: true });
   state.centerCoords = coords;
   updateTelemetry(coords);
@@ -498,11 +521,11 @@ function captureSky() {
   drawSkyOverlay();
   showCaptureToast(coords);
   updateCaptureMetadata(coords, capturedAt);
-  $("imageLink").href = url;
-  $("status").textContent =
-    `Requested ${state.survey} from PHONE ORIENTATION ONLY: ` +
-    `Az ${phonePointing.azDeg.toFixed(1)} deg, Alt ${phonePointing.altDeg.toFixed(1)} deg; ` +
-    `RA ${coords.raDeg.toFixed(4)} deg, Dec ${coords.decDeg.toFixed(4)} deg`;
+  $("imageLink").href = photoUrl;
+  $("status").textContent = phonePointing
+    ? `Captured phone camera frame: Az ${phonePointing.azDeg.toFixed(1)} deg, Alt ${phonePointing.altDeg.toFixed(1)} deg; ` +
+      `RA ${coords.raDeg.toFixed(4)} deg, Dec ${coords.decDeg.toFixed(4)} deg`
+    : "Captured phone camera frame. Enable orientation for RA/Dec from the phone sensors.";
 }
 
 async function startCamera() {
