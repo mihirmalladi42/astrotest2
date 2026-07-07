@@ -13,8 +13,6 @@ const state = {
   centerCoords: null,
   target: null,
   phonePointing: null,
-  guideAzDirection: 0,
-  guideTargetId: null,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -36,7 +34,6 @@ const signedDeltaDeg = (toDeg, fromDeg) => {
   const delta = wrap360(toDeg - fromDeg);
   return delta > 180 ? delta - 360 : delta;
 };
-const signOrZero = (value) => (value > 0 ? 1 : value < 0 ? -1 : 0);
 
 function julianDate(date = new Date()) {
   return date.getTime() / 86400000 + 2440587.5;
@@ -230,36 +227,13 @@ function sizeOverlayCanvas() {
   }
 }
 
-function stableGuideAzDelta(rawDeltaAz, targetId) {
-  if (state.guideTargetId !== targetId) {
-    state.guideTargetId = targetId;
-    state.guideAzDirection = 0;
-  }
-
-  const rawDirection = signOrZero(rawDeltaAz);
-  const absDelta = Math.abs(rawDeltaAz);
-  const releaseThreshold = 18;
-
-  if (state.guideAzDirection === 0 || absDelta <= releaseThreshold) {
-    state.guideAzDirection = rawDirection;
-    return rawDeltaAz;
-  }
-
-  if (rawDirection !== 0 && rawDirection !== state.guideAzDirection) {
-    return state.guideAzDirection * absDelta;
-  }
-
-  state.guideAzDirection = rawDirection;
-  return rawDeltaAz;
-}
-
 function targetScreenPosition(targetAltAz) {
   sizeOverlayCanvas();
   const canvas = $("skyOverlay");
   const aspect = canvas.width / canvas.height;
   const verticalFov = Math.max(0.2, state.fov);
   const horizontalFov = verticalFov * aspect;
-  const deltaAz = stableGuideAzDelta(signedDeltaDeg(targetAltAz.azDeg, state.az), state.target?.id);
+  const deltaAz = signedDeltaDeg(targetAltAz.azDeg, state.az);
   const deltaAlt = targetAltAz.altDeg - state.alt;
   const rightAngle = deltaAz * Math.cos(degToRad(state.alt));
   const upAngle = deltaAlt;
@@ -269,6 +243,8 @@ function targetScreenPosition(targetAltAz) {
     y: canvas.height / 2 - (upAngle / verticalFov) * canvas.height,
     rightAngle,
     upAngle,
+    deltaAz,
+    deltaAlt,
     horizontalFov,
     verticalFov,
   };
@@ -380,8 +356,6 @@ function updateGuide(coords) {
   liveGuideText.classList.remove("on-target");
 
   if (!state.target) {
-    state.guideTargetId = null;
-    state.guideAzDirection = 0;
     $("guideValue").textContent = "No target";
     $("guideHint").textContent = "Choose a target.";
     $("targetLock").textContent = "Choose a target to start guidance.";
@@ -409,17 +383,17 @@ function updateGuide(coords) {
     `${state.target.id}: ${state.target.name} (${state.target.type}) | ` +
     `RA ${raDegToHms(targetCoords.raDeg)}, Dec ${decDegToDms(targetCoords.decDeg)}`;
   const targetOffset = targetScreenPosition(targetAltAz);
-  const screenDistance = Math.hypot(targetOffset.rightAngle, targetOffset.upAngle);
+  const screenDistance = Math.hypot(targetOffset.deltaAz, targetOffset.deltaAlt);
   const centerThreshold = Math.max(2, state.fov * 0.5);
   const isBelowHorizon = targetAltAz.altDeg < 0;
   const isCentered = !isBelowHorizon && screenDistance <= centerThreshold;
 
   const azThreshold = 0.7;
   const altThreshold = 0.7;
-  const azAction = targetOffset.rightAngle > azThreshold ? "right" : targetOffset.rightAngle < -azThreshold ? "left" : "center";
-  const altAction = targetOffset.upAngle > altThreshold ? "up" : targetOffset.upAngle < -altThreshold ? "down" : "center";
-  const horizontalText = azAction === "center" ? "" : `${azAction} ${Math.abs(targetOffset.rightAngle).toFixed(1)}°`;
-  const verticalText = altAction === "center" ? "" : `${altAction} ${Math.abs(targetOffset.upAngle).toFixed(1)}°`;
+  const azAction = targetOffset.deltaAz > azThreshold ? "right" : targetOffset.deltaAz < -azThreshold ? "left" : "center";
+  const altAction = targetOffset.deltaAlt > altThreshold ? "up" : targetOffset.deltaAlt < -altThreshold ? "down" : "center";
+  const horizontalText = azAction === "center" ? "" : `${azAction} ${Math.abs(targetOffset.deltaAz).toFixed(1)}°`;
+  const verticalText = altAction === "center" ? "" : `${altAction} ${Math.abs(targetOffset.deltaAlt).toFixed(1)}°`;
   const moveText = [horizontalText, verticalText].filter(Boolean).join(" / ") || "centered";
 
   $("guideValue").textContent = `${state.target.id}: ${screenDistance.toFixed(1)} deg away`;
@@ -440,8 +414,13 @@ function updateGuide(coords) {
     : isCentered
     ? `ON TARGET ${state.target.id}`
     : `MOVE ${moveText.toUpperCase()}`;
-  $("targetAltAz").textContent = `Target: Alt ${angleDegToDms(targetAltAz.altDeg, { signed: true })}, Az ${angleDegToDms(targetAltAz.azDeg)}`;
-  $("deltaAltAz").textContent = isBelowHorizon ? "Move: target below horizon" : isCentered ? "Move: centered" : `Move: ${moveText}`;
+  $("targetAltAz").textContent =
+    `Target: Alt ${targetAltAz.altDeg.toFixed(1)}°, Az ${targetAltAz.azDeg.toFixed(1)}° | ` +
+    `Phone: Alt ${state.alt.toFixed(1)}°, Az ${state.az.toFixed(1)}°`;
+  $("deltaAltAz").textContent =
+    `Delta: Az ${targetOffset.deltaAz >= 0 ? "+" : ""}${targetOffset.deltaAz.toFixed(1)}°, ` +
+    `Alt ${targetOffset.deltaAlt >= 0 ? "+" : ""}${targetOffset.deltaAlt.toFixed(1)}° | ` +
+    (isBelowHorizon ? "target below horizon" : isCentered ? "centered" : `Move: ${moveText}`);
   void coords;
 }
 
@@ -746,15 +725,11 @@ function setTarget() {
   const target = catalog.objects.find((object) => object.id === selectedId);
   if (!target) {
     state.target = null;
-    state.guideTargetId = null;
-    state.guideAzDirection = 0;
     $("targetStatus").textContent = "No target selected.";
     solvePointing();
     return;
   }
   state.target = target;
-  state.guideTargetId = null;
-  state.guideAzDirection = 0;
   $("targetStatus").textContent = `${target.id}: ${target.name} (${target.type})`;
   solvePointing();
 }
