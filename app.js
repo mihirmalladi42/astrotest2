@@ -318,52 +318,50 @@ function updateGuide(coords) {
   });
   const deltaAz = signedDeltaDeg(targetAltAz.azDeg, state.az);
   const deltaAlt = targetAltAz.altDeg - state.alt;
-  const distance = Math.hypot(deltaAz * Math.cos(degToRad(state.alt)), deltaAlt);
+  const screenDistance = Math.hypot(deltaAz * Math.cos(degToRad(state.alt)), deltaAlt);
   const centerThreshold = Math.max(2, state.fov * 0.5);
-  const isCentered = distance <= centerThreshold;
-  const isBelowHorizon = targetAltAz.altDeg < 0;
+  const isCentered = screenDistance <= centerThreshold;
 
-  $("guideValue").textContent = `${state.target.id}: ${distance.toFixed(1)} deg away`;
-  $("guideHint").textContent =
-    isCentered
-      ? "Target centered. Resolve sky for detail."
-      : isBelowHorizon
-      ? "Target is below the horizon from this location right now."
-      : `${deltaAz > 0 ? "Turn right" : "Turn left"} ${Math.abs(deltaAz).toFixed(1)} deg, ${deltaAlt > 0 ? "tilt up" : "tilt down"} ${Math.abs(deltaAlt).toFixed(1)} deg`;
+  const azThreshold = 0.7;
+  const altThreshold = 0.7;
+  const horizontalDirection = deltaAz > azThreshold ? "right" : deltaAz < -azThreshold ? "left" : "center";
+  const verticalDirection = deltaAlt > altThreshold ? "up" : deltaAlt < -altThreshold ? "down" : "center";
+  const horizontalText = horizontalDirection === "center" ? "" : `${horizontalDirection} ${Math.abs(deltaAz).toFixed(1)}°`;
+  const verticalText = verticalDirection === "center" ? "" : `${verticalDirection} ${Math.abs(deltaAlt).toFixed(1)}°`;
+  const moveText = [horizontalText, verticalText].filter(Boolean).join(" / ") || "centered";
+
+  $("guideValue").textContent = `${state.target.id}: ${screenDistance.toFixed(1)} deg away`;
+  $("guideHint").textContent = isCentered
+    ? "Target centered. Resolve sky for detail."
+    : `Point ${moveText}.`;
   $("targetLock").textContent = isCentered
     ? `ON TARGET: ${state.target.id}`
-    : isBelowHorizon
-    ? `${state.target.id} is below the horizon`
-    : `Guide to ${state.target.id}: ${deltaAz > 0 ? "turn right" : "turn left"}, ${deltaAlt > 0 ? "tilt up" : "tilt down"}`;
+    : `Guide to ${state.target.id}: ${moveText}`;
   $("targetLock").classList.toggle("on-target", isCentered);
   liveGuideText.classList.toggle("on-target", isCentered);
   liveGuideText.textContent = isCentered
     ? `ON TARGET ${state.target.id}`
-    : isBelowHorizon
-    ? `${state.target.id} below horizon`
-    : `${deltaAz > 0 ? "RIGHT" : "LEFT"} ${Math.abs(deltaAz).toFixed(1)} deg / ${deltaAlt > 0 ? "UP" : "DOWN"} ${Math.abs(deltaAlt).toFixed(1)} deg`;
+    : `MOVE ${moveText.toUpperCase()}`;
   $("targetAltAz").textContent = `Target: Alt ${angleDegToDms(targetAltAz.altDeg, { signed: true })}, Az ${angleDegToDms(targetAltAz.azDeg)}`;
-  $("deltaAltAz").textContent = isCentered
-    ? "Move: centered"
-    : `Move: ${deltaAz > 0 ? "right" : "left"} ${Math.abs(deltaAz).toFixed(1)} deg, ${deltaAlt > 0 ? "up" : "down"} ${Math.abs(deltaAlt).toFixed(1)} deg`;
+  $("deltaAltAz").textContent = isCentered ? "Move: centered" : `Move: ${moveText}`;
 
-  if (!isCentered) {
-    const useHorizontal = Math.abs(deltaAz) > Math.abs(deltaAlt);
-    const arrowIcon = useHorizontal
-      ? deltaAz > 0
-        ? "→"
-        : "←"
-      : deltaAlt > 0
-      ? "↑"
-      : "↓";
+  const arrowIcon = isCentered
+    ? "◎"
+    : Math.abs(deltaAz) >= Math.abs(deltaAlt)
+    ? deltaAz > 0
+      ? "→"
+      : "←"
+    : deltaAlt > 0
+    ? "↑"
+    : "↓";
 
-    guideArrow.textContent = arrowIcon;
-    guideArrow.style.transform = "rotate(0deg)";
-    guideArrow.classList.add("visible");
+  guideArrow.textContent = arrowIcon;
+  guideArrow.style.transform = "rotate(0deg)";
+  guideArrow.classList.add("visible");
+  if (isCentered) {
+    guideArrow.classList.add("on-target");
   } else {
-    guideArrow.textContent = "◎";
-    guideArrow.style.transform = "rotate(0deg)";
-    guideArrow.classList.add("visible", "on-target");
+    guideArrow.classList.remove("on-target");
   }
   void coords;
 }
