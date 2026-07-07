@@ -343,10 +343,7 @@ function updateCaptureMetadata(coords, capturedAt = new Date()) {
 }
 
 function updateGuide(coords) {
-  const guideArrow = $("guideArrow");
   const liveGuideText = $("liveGuideText");
-  guideArrow.classList.remove("visible");
-  guideArrow.classList.remove("on-target");
   liveGuideText.classList.remove("on-target");
 
   if (!state.target) {
@@ -401,33 +398,6 @@ function updateGuide(coords) {
     : `MOVE ${moveText.toUpperCase()}`;
   $("targetAltAz").textContent = `Target: Alt ${angleDegToDms(targetAltAz.altDeg, { signed: true })}, Az ${angleDegToDms(targetAltAz.azDeg)}`;
   $("deltaAltAz").textContent = isCentered ? "Move: centered" : `Move: ${moveText}`;
-
-  const arrowIcon = isCentered
-    ? "◎"
-    : azAction === "center"
-    ? altAction === "up"
-      ? "↑"
-      : "↓"
-    : altAction === "center"
-    ? azAction === "right"
-      ? "→"
-      : "←"
-    : Math.abs(deltaAz) >= Math.abs(deltaAlt)
-    ? deltaAz > 0
-      ? "→"
-      : "←"
-    : deltaAlt > 0
-    ? "↑"
-    : "↓";
-
-  guideArrow.textContent = arrowIcon;
-  guideArrow.style.transform = "rotate(0deg)";
-  guideArrow.classList.add("visible");
-  if (isCentered) {
-    guideArrow.classList.add("on-target");
-  } else {
-    guideArrow.classList.remove("on-target");
-  }
   void coords;
 }
 

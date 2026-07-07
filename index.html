@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Astro Eyepiece Prototype</title>
-    <link rel="stylesheet" href="styles.css?v=20260707-target-box" />
+    <link rel="stylesheet" href="styles.css?v=20260707-top-guide" />
   </head>
   <body>
     <main class="shell">
@@ -14,7 +14,6 @@
           <img id="skyImage" alt="Resolved deep sky view from NASA SkyView" />
           <canvas id="skyOverlay" aria-hidden="true"></canvas>
           <div class="reticle" aria-hidden="true"></div>
-          <div id="guideArrow" class="guide-arrow" aria-hidden="true">▲</div>
           <div id="liveGuideText" class="live-guide-text">Choose target</div>
           <div class="hud">
             <span id="cameraStatus">Camera off</span>
@@ -126,6 +125,6 @@
     </main>
 
     <script src="catalog.js?v=20260706-targets"></script>
-    <script src="app.js?v=20260707-target-box-edge"></script>
+    <script src="app.js?v=20260707-top-guide"></script>
   </body>
 </html>
