@@ -226,50 +226,16 @@ function sizeOverlayCanvas() {
   }
 }
 
-function horizontalDirectionVector({ azDeg, altDeg }) {
-  const az = degToRad(azDeg);
-  const alt = degToRad(altDeg);
-  const cosAlt = Math.cos(alt);
-  return {
-    east: cosAlt * Math.sin(az),
-    north: cosAlt * Math.cos(az),
-    up: Math.sin(alt),
-  };
-}
-
-function dotVector(a, b) {
-  return a.east * b.east + a.north * b.north + a.up * b.up;
-}
-
-function cameraBasis() {
-  const az = degToRad(state.az);
-  const alt = degToRad(state.alt);
-  return {
-    forward: horizontalDirectionVector({ azDeg: state.az, altDeg: state.alt }),
-    right: {
-      east: Math.cos(az),
-      north: -Math.sin(az),
-      up: 0,
-    },
-    viewUp: {
-      east: -Math.sin(alt) * Math.sin(az),
-      north: -Math.sin(alt) * Math.cos(az),
-      up: Math.cos(alt),
-    },
-  };
-}
-
 function targetScreenPosition(targetAltAz) {
   sizeOverlayCanvas();
   const canvas = $("skyOverlay");
   const aspect = canvas.width / canvas.height;
   const verticalFov = Math.max(0.2, state.fov);
   const horizontalFov = verticalFov * aspect;
-  const basis = cameraBasis();
-  const targetVector = horizontalDirectionVector(targetAltAz);
-  const forwardAmount = dotVector(targetVector, basis.forward);
-  const rightAngle = radToDeg(Math.atan2(dotVector(targetVector, basis.right), forwardAmount));
-  const upAngle = radToDeg(Math.atan2(dotVector(targetVector, basis.viewUp), forwardAmount));
+  const deltaAz = signedDeltaDeg(targetAltAz.azDeg, state.az);
+  const deltaAlt = targetAltAz.altDeg - state.alt;
+  const rightAngle = deltaAz * Math.cos(degToRad(state.alt));
+  const upAngle = deltaAlt;
 
   return {
     x: canvas.width / 2 + (rightAngle / horizontalFov) * canvas.width,
