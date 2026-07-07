@@ -122,6 +122,32 @@ video {
   text-shadow: 0 1px 2px #000;
 }
 
+.capture-toast {
+  position: absolute;
+  z-index: 7;
+  left: 16px;
+  top: 16px;
+  max-width: min(380px, calc(100% - 32px));
+  padding: 12px 14px;
+  border: 1px solid rgba(104, 210, 198, 0.55);
+  border-radius: 6px;
+  background: rgba(8, 10, 13, 0.82);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.45;
+  white-space: pre-line;
+  opacity: 0;
+  transform: translateY(-6px);
+  pointer-events: none;
+  transition: opacity 180ms ease, transform 180ms ease;
+  text-shadow: 0 1px 2px #000;
+}
+
+.capture-toast.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 .target-dot {
   position: absolute;
   z-index: 5;

@@ -246,6 +246,19 @@ function updateTelemetry(coords) {
   $("pointingValue").textContent = `Az ${angleDegToDms(state.az)}, Alt ${angleDegToDms(state.alt, { signed: true })}`;
 }
 
+function showCaptureToast(coords) {
+  const toast = $("captureToast");
+  if (!toast) return;
+  toast.textContent =
+    `Taken picture at Alt: ${angleDegToDms(state.alt, { signed: true })}, Az: ${angleDegToDms(state.az)}\n` +
+    `RA: ${raDegToHms(coords.raDeg)}, Dec: ${decDegToDms(coords.decDeg)}`;
+  toast.classList.add("visible");
+  clearTimeout(showCaptureToast.hideTimer);
+  showCaptureToast.hideTimer = setTimeout(() => {
+    toast.classList.remove("visible");
+  }, 7000);
+}
+
 function updateGuide(coords) {
   const arrows = {
     up: $("guideUp"),
@@ -322,6 +335,7 @@ function captureSky() {
   image.addEventListener("load", drawSkyOverlay, { once: true });
   state.centerCoords = coords;
   drawSkyOverlay();
+  showCaptureToast(coords);
   $("imageLink").href = url;
   $("status").textContent = `Requested ${state.survey} at RA ${coords.raDeg.toFixed(4)} deg, Dec ${coords.decDeg.toFixed(4)} deg`;
 }
