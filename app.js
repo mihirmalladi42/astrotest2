@@ -226,107 +226,12 @@ function sizeOverlayCanvas() {
   }
 }
 
-function targetScreenPosition(targetAltAz) {
-  const canvas = $("skyOverlay");
-  const aspect = canvas.width / canvas.height;
-  const verticalFov = Math.max(0.2, state.fov);
-  const horizontalFov = verticalFov * aspect;
-  const deltaAz = signedDeltaDeg(targetAltAz.azDeg, state.az);
-  const deltaAlt = targetAltAz.altDeg - state.alt;
-  const screenDeltaAz = deltaAz * Math.cos(degToRad(state.alt));
-
-  return {
-    x: canvas.width / 2 + (screenDeltaAz / horizontalFov) * canvas.width,
-    y: canvas.height / 2 - (deltaAlt / verticalFov) * canvas.height,
-    deltaAz,
-    deltaAlt,
-    horizontalFov,
-    verticalFov,
-  };
-}
-
-function drawTargetBox(ctx, target, targetAltAz) {
-  if (targetAltAz.altDeg < 0) return;
-
-  const canvas = $("skyOverlay");
-  const ratio = window.devicePixelRatio || 1;
-  const projected = targetScreenPosition(targetAltAz);
-  const margin = 32 * ratio;
-  const isNearFrame =
-    projected.x >= -margin &&
-    projected.x <= canvas.width + margin &&
-    projected.y >= -margin &&
-    projected.y <= canvas.height + margin;
-
-  if (!isNearFrame) return;
-
-  const objectSizeDeg = Math.max(0.08, target.size || state.fov * 0.2);
-  const objectSizePx = (objectSizeDeg / projected.verticalFov) * canvas.height;
-  const minBox = 46 * ratio;
-  const maxBox = Math.min(canvas.width, canvas.height) * 0.52;
-  const boxSize = Math.max(minBox, Math.min(maxBox, objectSizePx));
-  const half = boxSize / 2;
-  const corner = Math.max(12 * ratio, boxSize * 0.22);
-  const left = projected.x - half;
-  const right = projected.x + half;
-  const top = projected.y - half;
-  const bottom = projected.y + half;
-  const centerHit = Math.hypot(projected.deltaAz * Math.cos(degToRad(state.alt)), projected.deltaAlt) <= Math.max(1, state.fov * 0.18);
-
-  ctx.save();
-  ctx.lineWidth = 2.5 * ratio;
-  ctx.strokeStyle = centerHit ? "rgba(104, 210, 198, 0.95)" : "rgba(255, 202, 95, 0.95)";
-  ctx.fillStyle = centerHit ? "rgba(104, 210, 198, 0.95)" : "rgba(255, 202, 95, 0.95)";
-  ctx.shadowColor = "rgba(0, 0, 0, 0.85)";
-  ctx.shadowBlur = 8 * ratio;
-
-  ctx.beginPath();
-  ctx.moveTo(left, top + corner);
-  ctx.lineTo(left, top);
-  ctx.lineTo(left + corner, top);
-  ctx.moveTo(right - corner, top);
-  ctx.lineTo(right, top);
-  ctx.lineTo(right, top + corner);
-  ctx.moveTo(right, bottom - corner);
-  ctx.lineTo(right, bottom);
-  ctx.lineTo(right - corner, bottom);
-  ctx.moveTo(left + corner, bottom);
-  ctx.lineTo(left, bottom);
-  ctx.lineTo(left, bottom - corner);
-  ctx.stroke();
-
-  ctx.beginPath();
-  ctx.arc(projected.x, projected.y, 4.5 * ratio, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.lineWidth = 1.25 * ratio;
-  ctx.beginPath();
-  ctx.moveTo(projected.x - 13 * ratio, projected.y);
-  ctx.lineTo(projected.x + 13 * ratio, projected.y);
-  ctx.moveTo(projected.x, projected.y - 13 * ratio);
-  ctx.lineTo(projected.x, projected.y + 13 * ratio);
-  ctx.stroke();
-  ctx.restore();
-}
 
 function drawSkyOverlay() {
   sizeOverlayCanvas();
   const canvas = $("skyOverlay");
   const ctx = canvas.getContext("2d");
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  if (!state.target) return;
-
-  const targetCoords = objectEquatorial(state.target);
-  if (!targetCoords) return;
-
-  const targetAltAz = equatorialToHorizontal({
-    raDeg: targetCoords.raDeg,
-    decDeg: targetCoords.decDeg,
-    latDeg: state.lat,
-    lonDeg: state.lon,
-  });
-  drawTargetBox(ctx, state.target, targetAltAz);
 }
 
 function syncInputsFromState() {
