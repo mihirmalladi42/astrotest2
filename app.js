@@ -348,18 +348,22 @@ function updateGuide(coords) {
     : `Move: ${deltaAz > 0 ? "right" : "left"} ${Math.abs(deltaAz).toFixed(1)} deg, ${deltaAlt > 0 ? "up" : "down"} ${Math.abs(deltaAlt).toFixed(1)} deg`;
 
   if (!isCentered) {
-    const screenDeltaAz = deltaAz * Math.cos(degToRad(state.alt));
-    const arrowAngle = radToDeg(Math.atan2(screenDeltaAz, deltaAlt));
-    guideArrow.textContent = "▲";
-    guideArrow.style.transform = `rotate(${arrowAngle}deg)`;
+    const useHorizontal = Math.abs(deltaAz) > Math.abs(deltaAlt);
+    const arrowIcon = useHorizontal
+      ? deltaAz > 0
+        ? "→"
+        : "←"
+      : deltaAlt > 0
+      ? "↑"
+      : "↓";
+
+    guideArrow.textContent = arrowIcon;
+    guideArrow.style.transform = "rotate(0deg)";
     guideArrow.classList.add("visible");
-  } else if (isCentered) {
+  } else {
     guideArrow.textContent = "◎";
     guideArrow.style.transform = "rotate(0deg)";
     guideArrow.classList.add("visible", "on-target");
-  } else {
-    guideArrow.textContent = "▲";
-    guideArrow.style.transform = "rotate(0deg)";
   }
   void coords;
 }
