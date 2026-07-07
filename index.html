@@ -16,7 +16,7 @@
           <div class="reticle" aria-hidden="true"></div>
           <div class="target-dot" id="targetDot" aria-hidden="true"></div>
           <div id="guideArrow" class="guide-arrow" aria-hidden="true">▲</div>
-          <div id="liveGuideText" class="live-guide-text">Search target</div>
+          <div id="liveGuideText" class="live-guide-text">Choose target</div>
           <div class="hud">
             <span id="cameraStatus">Camera off</span>
             <span class="hud-coordinates">
@@ -46,19 +46,39 @@
 
         <div class="target-panel">
           <label>
-            Target Search
-            <input id="targetSearch" type="search" list="targetOptions" placeholder="M31, Orion Nebula, Pleiades..." />
-            <datalist id="targetOptions"></datalist>
+            Catalog
+            <select id="targetCatalog">
+              <option value="all">All Objects</option>
+              <option value="messier">Messier</option>
+              <option value="ngc">NGC</option>
+              <option value="ic">IC</option>
+              <option value="planet">Planets</option>
+              <option value="hd">HD</option>
+            </select>
+          </label>
+          <label>
+            Filter
+            <select id="targetType">
+              <option value="all">All Types</option>
+              <option value="galaxy">Galaxy</option>
+              <option value="nebula">Nebula</option>
+              <option value="star">Star</option>
+              <option value="planet">Planet</option>
+            </select>
+          </label>
+          <label>
+            Object
+            <select id="targetSelect"></select>
           </label>
           <button id="targetSet" type="button">Set Target</button>
           <p id="targetStatus" class="target-status">No target selected.</p>
-          <div id="targetLock" class="target-lock">Search for a target to start guidance.</div>
+          <div id="targetLock" class="target-lock">Choose a target to start guidance.</div>
           <div class="guide-metrics">
             <span id="targetAltAz">Target: --</span>
             <span id="deltaAltAz">Move: --</span>
           </div>
           <div class="sky-map-wrap">
-            <canvas id="skyMap" aria-label="Visible sky map with constellations and target markers"></canvas>
+            <canvas id="skyMap" aria-label="Visible sky map with object and target markers"></canvas>
             <div class="sky-map-legend">
               <span><i class="legend-current"></i>Current</span>
               <span><i class="legend-target"></i>Target</span>
@@ -66,8 +86,7 @@
             </div>
           </div>
           <div class="toggles">
-            <label><input id="showObjects" type="checkbox" checked /> Deep-sky circles</label>
-            <label><input id="showConstellations" type="checkbox" checked /> Constellations</label>
+            <label><input id="showObjects" type="checkbox" checked /> Object circles</label>
           </div>
         </div>
 
@@ -108,7 +127,7 @@
         <dl class="telemetry">
           <div><dt>RA</dt><dd><span id="raValue"></span><small id="raHms"></small></dd></div>
           <div><dt>Dec</dt><dd><span id="decValue"></span><small id="decDms"></small></dd></div>
-          <div><dt>Guide</dt><dd><span id="guideValue">No target</span><small id="guideHint">Search for a target.</small></dd></div>
+          <div><dt>Guide</dt><dd><span id="guideValue">No target</span><small id="guideHint">Choose a target.</small></dd></div>
           <div><dt>LST</dt><dd><span id="lstValue"></span></dd></div>
         </dl>
 
@@ -118,7 +137,7 @@
       </aside>
     </main>
 
-    <script src="catalog.js?v=20260706"></script>
-    <script src="app.js?v=20260706-dms"></script>
+    <script src="catalog.js?v=20260706-targets"></script>
+    <script src="app.js?v=20260706-targets"></script>
   </body>
 </html>

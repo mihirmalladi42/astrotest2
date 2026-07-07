@@ -17,6 +17,15 @@ const state = {
 const $ = (id) => document.getElementById(id);
 const catalog = window.ASTRO_CATALOG || { objects: [], constellations: [] };
 const LIVE_VIEW_HORIZONTAL_FOV_DEG = 95;
+const PLANET_ELEMENTS = {
+  Mercury: { N: [48.3313, 3.24587e-5], i: [7.0047, 5.0e-8], w: [29.1241, 1.01444e-5], a: [0.387098, 0], e: [0.205635, 5.59e-10], M: [168.6562, 4.0923344368] },
+  Venus: { N: [76.6799, 2.4659e-5], i: [3.3946, 2.75e-8], w: [54.8910, 1.38374e-5], a: [0.723330, 0], e: [0.006773, -1.302e-9], M: [48.0052, 1.6021302244] },
+  Mars: { N: [49.5574, 2.11081e-5], i: [1.8497, -1.78e-8], w: [286.5016, 2.92961e-5], a: [1.523688, 0], e: [0.093405, 2.516e-9], M: [18.6021, 0.5240207766] },
+  Jupiter: { N: [100.4542, 2.76854e-5], i: [1.3030, -1.557e-7], w: [273.8777, 1.64505e-5], a: [5.20256, 0], e: [0.048498, 4.469e-9], M: [19.8950, 0.0830853001] },
+  Saturn: { N: [113.6634, 2.3898e-5], i: [2.4886, -1.081e-7], w: [339.3939, 2.97661e-5], a: [9.55475, 0], e: [0.055546, -9.499e-9], M: [316.9670, 0.0334442282] },
+  Uranus: { N: [74.0005, 1.3978e-5], i: [0.7733, 1.9e-8], w: [96.6612, 3.0565e-5], a: [19.18171, -1.55e-8], e: [0.047318, 7.45e-9], M: [142.5905, 0.011725806] },
+  Neptune: { N: [131.7806, 3.0173e-5], i: [1.7700, -2.55e-7], w: [272.8461, -6.027e-6], a: [30.05826, 3.313e-8], e: [0.008606, 2.15e-9], M: [260.2471, 0.005995147] },
+};
 
 const degToRad = (deg) => (deg * Math.PI) / 180;
 const radToDeg = (rad) => (rad * 180) / Math.PI;
@@ -88,6 +97,70 @@ function equatorialToHorizontal({ raDeg, decDeg, latDeg, lonDeg, date = new Date
     azDeg: wrap360(radToDeg(az)),
     altDeg: radToDeg(alt),
   };
+}
+
+function daysSinceJ2000(date = new Date()) {
+  return julianDate(date) - 2451543.5;
+}
+
+function orbitalValue(pair, days) {
+  return pair[0] + pair[1] * days;
+}
+
+function heliocentricEcliptic(planetName, date = new Date()) {
+  const elements = PLANET_ELEMENTS[planetName];
+  if (!elements) return null;
+  const days = daysSinceJ2000(date);
+  const N = degToRad(orbitalValue(elements.N, days));
+  const i = degToRad(orbitalValue(elements.i, days));
+  const w = degToRad(orbitalValue(elements.w, days));
+  const a = orbitalValue(elements.a, days);
+  const e = orbitalValue(elements.e, days);
+  const M = degToRad(wrap360(orbitalValue(elements.M, days)));
+  let E = M + e * Math.sin(M) * (1 + e * Math.cos(M));
+  for (let step = 0; step < 4; step += 1) {
+    E -= (E - e * Math.sin(E) - M) / (1 - e * Math.cos(E));
+  }
+  const xv = a * (Math.cos(E) - e);
+  const yv = a * Math.sqrt(1 - e * e) * Math.sin(E);
+  const v = Math.atan2(yv, xv);
+  const r = Math.hypot(xv, yv);
+  const cosN = Math.cos(N);
+  const sinN = Math.sin(N);
+  const cosI = Math.cos(i);
+  const sinI = Math.sin(i);
+  const vw = v + w;
+  const cosVw = Math.cos(vw);
+  const sinVw = Math.sin(vw);
+  return {
+    x: r * (cosN * cosVw - sinN * sinVw * cosI),
+    y: r * (sinN * cosVw + cosN * sinVw * cosI),
+    z: r * sinVw * sinI,
+  };
+}
+
+function planetEquatorial(planetName, date = new Date()) {
+  const earth = heliocentricEcliptic("Earth", date);
+  const planet = heliocentricEcliptic(planetName, date);
+  if (!earth || !planet) return null;
+  const x = planet.x - earth.x;
+  const y = planet.y - earth.y;
+  const z = planet.z - earth.z;
+  const obliquity = degToRad(23.4393 - 3.563e-7 * daysSinceJ2000(date));
+  const yEq = y * Math.cos(obliquity) - z * Math.sin(obliquity);
+  const zEq = y * Math.sin(obliquity) + z * Math.cos(obliquity);
+  return {
+    raDeg: wrap360(radToDeg(Math.atan2(yEq, x))),
+    decDeg: radToDeg(Math.atan2(zEq, Math.hypot(x, yEq))),
+  };
+}
+
+PLANET_ELEMENTS.Earth = { N: [0, 0], i: [0, 0], w: [282.9404, 4.70935e-5], a: [1.0, 0], e: [0.016709, -1.151e-9], M: [356.0470, 0.9856002585] };
+
+function objectEquatorial(object, date = new Date()) {
+  if (!object) return null;
+  if (object.kind === "planet") return planetEquatorial(object.name, date);
+  return { raDeg: object.ra, decDeg: object.dec };
 }
 
 function angularDistanceDeg(aRa, aDec, bRa, bDec) {
@@ -209,46 +282,18 @@ function drawSkyOverlay() {
   const ctx = canvas.getContext("2d");
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  const showConstellations = $("showConstellations")?.checked;
   const showObjects = $("showObjects")?.checked;
   const ratio = window.devicePixelRatio || 1;
   ctx.lineWidth = 1.5 * ratio;
   ctx.font = `${12 * ratio}px system-ui, sans-serif`;
 
-  if (showConstellations) {
-    ctx.strokeStyle = "rgba(104, 210, 198, 0.55)";
-    ctx.fillStyle = "rgba(104, 210, 198, 0.78)";
-    catalog.constellations.forEach((constellation) => {
-      let labelPoint = null;
-      const starPositions = {};
-      Object.entries(constellation.stars).forEach(([name, star]) => {
-        const altAz = equatorialToHorizontal({
-          raDeg: star[0],
-          decDeg: star[1],
-          latDeg: state.lat,
-          lonDeg: state.lon,
-        });
-        starPositions[name] = projectAltAzToLiveFrame(altAz.azDeg, altAz.altDeg, canvas, { allowMargin: true });
-      });
-      constellation.lines.forEach(([from, to]) => {
-        const pa = starPositions[from];
-        const pb = starPositions[to];
-        if (!pa || !pb) return;
-        ctx.beginPath();
-        ctx.moveTo(pa.x, pa.y);
-        ctx.lineTo(pb.x, pb.y);
-        ctx.stroke();
-        labelPoint = labelPoint || pa;
-      });
-      if (labelPoint) ctx.fillText(constellation.name, labelPoint.x + 8, labelPoint.y - 8);
-    });
-  }
-
   if (showObjects) {
     catalog.objects.forEach((object) => {
+      const objectCoords = objectEquatorial(object);
+      if (!objectCoords) return;
       const altAz = equatorialToHorizontal({
-        raDeg: object.ra,
-        decDeg: object.dec,
+        raDeg: objectCoords.raDeg,
+        decDeg: objectCoords.decDeg,
         latDeg: state.lat,
         lonDeg: state.lon,
       });
@@ -332,37 +377,13 @@ function drawSkyMap() {
   ctx.fillText("Zenith", 8 * ratio, 28 * ratio);
   ctx.fillText("Horizon", 8 * ratio, canvas.height - 8 * ratio);
 
-  if ($("showConstellations")?.checked) {
-    ctx.strokeStyle = "rgba(104, 210, 198, 0.5)";
-    ctx.fillStyle = "rgba(104, 210, 198, 0.72)";
-    catalog.constellations.forEach((constellation) => {
-      let labelPoint = null;
-      const starPositions = {};
-      Object.entries(constellation.stars).forEach(([name, star]) => {
-        const altAz = equatorialToHorizontal({
-          raDeg: star[0],
-          decDeg: star[1],
-          latDeg: state.lat,
-          lonDeg: state.lon,
-        });
-        starPositions[name] = projectAltAzToMap(altAz.azDeg, altAz.altDeg, canvas);
-      });
-      constellation.lines.forEach(([from, to]) => {
-        const a = starPositions[from];
-        const b = starPositions[to];
-        if (!a || !b) return;
-        drawWrappedLine(ctx, a, b, canvas.width);
-        labelPoint = labelPoint || a;
-      });
-      if (labelPoint) ctx.fillText(constellation.name, labelPoint.x + 5 * ratio, labelPoint.y - 5 * ratio);
-    });
-  }
-
   if ($("showObjects")?.checked) {
     catalog.objects.forEach((object) => {
+      const objectCoords = objectEquatorial(object);
+      if (!objectCoords) return;
       const altAz = equatorialToHorizontal({
-        raDeg: object.ra,
-        decDeg: object.dec,
+        raDeg: objectCoords.raDeg,
+        decDeg: objectCoords.decDeg,
         latDeg: state.lat,
         lonDeg: state.lon,
       });
@@ -454,18 +475,25 @@ function updateGuide(coords) {
 
   if (!state.target) {
     $("guideValue").textContent = "No target";
-    $("guideHint").textContent = "Search for a target.";
-    $("targetLock").textContent = "Search for a target to start guidance.";
+    $("guideHint").textContent = "Choose a target.";
+    $("targetLock").textContent = "Choose a target to start guidance.";
     $("targetLock").classList.remove("on-target");
     $("targetAltAz").textContent = "Target: --";
     $("deltaAltAz").textContent = "Move: --";
-    liveGuideText.textContent = "Search target";
+    liveGuideText.textContent = "Choose target";
+    return;
+  }
+
+  const targetCoords = objectEquatorial(state.target);
+  if (!targetCoords) {
+    $("guideValue").textContent = "No coordinates";
+    $("guideHint").textContent = "This target cannot be resolved right now.";
     return;
   }
 
   const targetAltAz = equatorialToHorizontal({
-    raDeg: state.target.ra,
-    decDeg: state.target.dec,
+    raDeg: targetCoords.raDeg,
+    decDeg: targetCoords.decDeg,
     latDeg: state.lat,
     lonDeg: state.lon,
   });
@@ -705,34 +733,71 @@ function objectLabel(object) {
   return `${object.id} - ${object.name}`;
 }
 
-function populateTargetSearch() {
-  const options = $("targetOptions");
-  if (!options) return;
-  options.innerHTML = "";
-  catalog.objects.forEach((object) => {
-    const option = document.createElement("option");
-    option.value = objectLabel(object);
-    options.appendChild(option);
+function catalogGroup(object) {
+  if (object.kind === "planet") return "planet";
+  if (object.id.startsWith("M")) return "messier";
+  if (object.id.startsWith("NGC")) return "ngc";
+  if (object.id.startsWith("IC")) return "ic";
+  if (object.id.startsWith("HD")) return "hd";
+  return "object";
+}
+
+function objectTypeGroup(object) {
+  const type = object.type.toLowerCase();
+  if (type.includes("galaxy")) return "galaxy";
+  if (type.includes("planet")) return "planet";
+  if (type.includes("star") || type.includes("cluster")) return "star";
+  if (type.includes("nebula") || type.includes("remnant")) return "nebula";
+  return "object";
+}
+
+function filteredTargets() {
+  const selectedCatalog = $("targetCatalog")?.value || "all";
+  const selectedType = $("targetType")?.value || "all";
+  return catalog.objects.filter((object) => {
+    const groupMatches = selectedCatalog === "all" || catalogGroup(object) === selectedCatalog;
+    const typeMatches = selectedType === "all" || objectTypeGroup(object) === selectedType;
+    return groupMatches && typeMatches;
   });
 }
 
-function findTarget(query) {
-  const normalized = query.trim().toLowerCase();
-  if (!normalized) return null;
-  return catalog.objects.find((object) => {
-    const fields = [object.id, object.name, object.type, objectLabel(object)].map((value) => value.toLowerCase());
-    return fields.some((value) => value === normalized || value.includes(normalized));
+function populateTargetSelectors() {
+  const select = $("targetSelect");
+  if (!select) return;
+  const previousValue = select.value;
+  const targets = filteredTargets();
+  select.innerHTML = "";
+  targets.forEach((object) => {
+    const option = document.createElement("option");
+    option.value = object.id;
+    option.textContent = `${objectLabel(object)} (${object.type})`;
+    select.appendChild(option);
   });
+  if (targets.length === 0) {
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = "No matching objects";
+    select.appendChild(option);
+    state.target = null;
+    $("targetStatus").textContent = "No objects match this catalog/type filter.";
+    solvePointing();
+    return;
+  }
+  if (targets.some((object) => object.id === previousValue)) {
+    select.value = previousValue;
+  }
 }
 
 function setTarget() {
-  const target = findTarget($("targetSearch").value);
+  const selectedId = $("targetSelect").value;
+  const target = catalog.objects.find((object) => object.id === selectedId);
   if (!target) {
-    $("targetStatus").textContent = "No catalog match found.";
+    state.target = null;
+    $("targetStatus").textContent = "No target selected.";
+    solvePointing();
     return;
   }
   state.target = target;
-  $("targetSearch").value = objectLabel(target);
   $("targetStatus").textContent = `${target.id}: ${target.name} (${target.type})`;
   solvePointing();
 }
@@ -741,20 +806,24 @@ function wireControls() {
   ["latitude", "longitude", "azimuth", "altitude", "fieldOfView", "survey"].forEach((id) => {
     $(id).addEventListener("input", solvePointing);
   });
-  ["showObjects", "showConstellations"].forEach((id) => {
+  ["showObjects"].forEach((id) => {
     $(id).addEventListener("change", () => {
       drawSkyOverlay();
       drawSkyMap();
     });
   });
+  ["targetCatalog", "targetType"].forEach((id) => {
+    $(id).addEventListener("change", () => {
+      populateTargetSelectors();
+      setTarget();
+    });
+  });
+  $("targetSelect").addEventListener("change", setTarget);
   $("capture").addEventListener("click", captureSky);
   $("location").addEventListener("click", useLocation);
   $("orientation").addEventListener("click", enableOrientation);
   $("cameraToggle").addEventListener("click", startCamera);
   $("targetSet").addEventListener("click", setTarget);
-  $("targetSearch").addEventListener("keydown", (event) => {
-    if (event.key === "Enter") setTarget();
-  });
   window.addEventListener("resize", () => {
     drawSkyOverlay();
     drawSkyMap();
@@ -762,6 +831,6 @@ function wireControls() {
 }
 
 syncInputsFromState();
-populateTargetSearch();
+populateTargetSelectors();
 wireControls();
 solvePointing();
