@@ -13,6 +13,7 @@ const state = {
   centerCoords: null,
   target: null,
   phonePointing: null,
+  capturedPhotoUrl: null,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -445,6 +446,13 @@ function freshPhonePointing(maxAgeMs = 5000) {
   return ageMs <= maxAgeMs ? state.phonePointing : null;
 }
 
+function revokeCapturedPhotoUrl() {
+  if (state.capturedPhotoUrl) {
+    URL.revokeObjectURL(state.capturedPhotoUrl);
+    state.capturedPhotoUrl = null;
+  }
+}
+
 function captureCameraFrame() {
   const video = $("camera");
   if (!state.cameraReady || !video.srcObject) return null;
@@ -455,12 +463,22 @@ function captureCameraFrame() {
   canvas.height = video.videoHeight;
   const ctx = canvas.getContext("2d");
   ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-  return canvas.toDataURL("image/jpeg", 0.92);
+  return new Promise((resolve) => {
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        resolve(null);
+        return;
+      }
+      revokeCapturedPhotoUrl();
+      state.capturedPhotoUrl = URL.createObjectURL(blob);
+      resolve(state.capturedPhotoUrl);
+    }, "image/jpeg", 0.92);
+  });
 }
 
-function captureSky() {
+async function captureSky() {
   const capturedAt = new Date();
-  const photoUrl = captureCameraFrame();
+  const photoUrl = await captureCameraFrame();
   if (!photoUrl) {
     $("status").textContent = "Photo blocked: start the camera and wait for the live preview before capturing.";
     $("cameraStatus").textContent = "Camera required";
@@ -486,9 +504,6 @@ function captureSky() {
         date: capturedAt,
       })
     : solvePointing();
-  const image = $("skyImage");
-  image.src = photoUrl;
-  image.addEventListener("load", drawSkyOverlay, { once: true });
   state.centerCoords = coords;
   updateTelemetry(coords);
   updateGuide(coords);
@@ -518,7 +533,9 @@ async function startCamera() {
     state.cameraReady = true;
     $("skyImage").removeAttribute("src");
     drawSkyOverlay();
+    revokeCapturedPhotoUrl();
     $("imageLink").href = "https://skyview.gsfc.nasa.gov/current/cgi/query.pl";
+    $("imageLink").removeAttribute("download");
     $("cameraStatus").textContent = "Camera live";
     $("status").textContent = "Live camera view restored.";
   } catch (error) {
