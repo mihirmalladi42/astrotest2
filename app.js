@@ -260,6 +260,16 @@ function showCaptureToast(coords) {
   }, 7000);
 }
 
+function updateCaptureMetadata(coords, capturedAt = new Date()) {
+  const metadata = $("captureMetadata");
+  if (!metadata) return;
+  metadata.textContent =
+    `Time (UTC): ${capturedAt.toISOString()}\n` +
+    `RA: ${raDegToHms(coords.raDeg)}, Dec: ${decDegToDms(coords.decDeg)}\n` +
+    `Alt: ${angleDegToDms(state.alt, { signed: true })}, Az: ${angleDegToDms(state.az)}\n` +
+    `Coordinates: ${state.lat.toFixed(6)}, ${state.lon.toFixed(6)}`;
+}
+
 function updateGuide(coords) {
   const arrows = {
     up: $("guideUp"),
@@ -329,6 +339,7 @@ function solvePointing() {
 }
 
 function captureSky() {
+  const capturedAt = new Date();
   const coords = solvePointing();
   const url = skyViewUrl(coords.raDeg, coords.decDeg);
   const image = $("skyImage");
@@ -337,6 +348,7 @@ function captureSky() {
   state.centerCoords = coords;
   drawSkyOverlay();
   showCaptureToast(coords);
+  updateCaptureMetadata(coords, capturedAt);
   $("imageLink").href = url;
   $("status").textContent = `Requested ${state.survey} at RA ${coords.raDeg.toFixed(4)} deg, Dec ${coords.decDeg.toFixed(4)} deg`;
 }
