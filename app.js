@@ -370,24 +370,70 @@ async function startCamera() {
   }
 }
 
+function applyLocation(position) {
+  const { latitude, longitude, accuracy } = position.coords;
+  state.lat = latitude;
+  state.lon = longitude;
+  syncInputsFromState();
+  solvePointing();
+  const accuracyText = typeof accuracy === "number" ? ` +/- ${Math.round(accuracy)} m` : "";
+  $("status").textContent = `Location loaded: ${latitude.toFixed(5)}, ${longitude.toFixed(5)}${accuracyText}`;
+}
+
+function geolocationErrorMessage(error) {
+  if (!error) return "Location did not return a result.";
+  if (error.code === error.PERMISSION_DENIED) return "Location permission was blocked.";
+  if (error.code === error.POSITION_UNAVAILABLE) return "Location is unavailable on this device/browser.";
+  if (error.code === error.TIMEOUT) return "Location timed out. Try again with GPS/Wi-Fi enabled.";
+  return error.message || "Location failed.";
+}
+
 function useLocation() {
   if (!navigator.geolocation) {
     $("status").textContent = "This browser does not expose geolocation.";
     return;
   }
+  $("status").textContent = "Getting fresh location...";
+
+  let bestAccuracy = Infinity;
+  let watchId = null;
+  const options = { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 };
+
+  const handlePosition = (position) => {
+    const accuracy = position.coords.accuracy ?? Infinity;
+    if (accuracy <= bestAccuracy) {
+      bestAccuracy = accuracy;
+      applyLocation(position);
+    }
+    if (accuracy <= 100 && watchId !== null) {
+      navigator.geolocation.clearWatch(watchId);
+      watchId = null;
+    }
+  };
+
   navigator.geolocation.getCurrentPosition(
-    (position) => {
-      state.lat = position.coords.latitude;
-      state.lon = position.coords.longitude;
-      syncInputsFromState();
-      solvePointing();
-      $("status").textContent = "Location loaded.";
+    handlePosition,
+    (error) => {
+      $("status").textContent = geolocationErrorMessage(error);
     },
-    () => {
-      $("status").textContent = "Location permission was not granted.";
-    },
-    { enableHighAccuracy: true, timeout: 12000 }
+    options
   );
+
+  watchId = navigator.geolocation.watchPosition(
+    handlePosition,
+    (error) => {
+      if (!Number.isFinite(bestAccuracy)) {
+        $("status").textContent = geolocationErrorMessage(error);
+      }
+    },
+    options
+  );
+
+  setTimeout(() => {
+    if (watchId !== null) {
+      navigator.geolocation.clearWatch(watchId);
+    }
+  }, 22000);
 }
 
 function enableOrientation() {
