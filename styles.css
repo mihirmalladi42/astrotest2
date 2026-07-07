@@ -155,36 +155,21 @@ video {
   transform: translateY(0);
 }
 
-.target-dot {
-  position: absolute;
-  z-index: 5;
-  left: 50%;
-  top: 50%;
-  width: 18px;
-  height: 18px;
-  border: 2px solid var(--accent-strong);
-  border-radius: 50%;
-  transform: translate(-50%, -50%);
-  opacity: 0;
-  pointer-events: none;
-  box-shadow: 0 0 0 6px rgba(255, 202, 95, 0.18);
-}
-
 .guide-arrow {
   position: absolute;
   z-index: 5;
   display: grid;
   place-items: center;
-  left: calc(50% + 66px);
+  left: 50%;
   top: 50%;
-  width: 42px;
-  height: 42px;
+  width: 54px;
+  height: 54px;
   color: var(--accent-strong);
-  font-size: 32px;
+  font-size: 42px;
   opacity: 0;
   transform: translate(-50%, -50%) rotate(0deg);
   transform-origin: 50% 50%;
-  text-shadow: 0 1px 8px #000;
+  text-shadow: 0 2px 10px #000;
   transition: opacity 160ms ease, transform 160ms ease;
   pointer-events: none;
 }
@@ -301,70 +286,6 @@ p {
   color: var(--muted);
   font-size: 12px;
   line-height: 1.35;
-}
-
-.sky-map-wrap {
-  display: grid;
-  gap: 8px;
-}
-
-#skyMap {
-  width: 100%;
-  aspect-ratio: 2 / 1;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: #050608;
-}
-
-.sky-map-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.sky-map-legend span {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.sky-map-legend i {
-  width: 8px;
-  height: 8px;
-  display: inline-block;
-  border-radius: 50%;
-}
-
-.legend-current {
-  background: var(--accent);
-}
-
-.legend-target {
-  background: var(--accent-strong);
-}
-
-.legend-object {
-  border: 1px solid var(--accent-strong);
-}
-
-.toggles {
-  display: grid;
-  gap: 8px;
-}
-
-.toggles label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  text-transform: none;
-  font-size: 13px;
-}
-
-.toggles input {
-  width: auto;
-  min-height: auto;
 }
 
 button,

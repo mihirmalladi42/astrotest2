@@ -16,7 +16,6 @@ const state = {
 
 const $ = (id) => document.getElementById(id);
 const catalog = window.ASTRO_CATALOG || { objects: [], constellations: [] };
-const LIVE_VIEW_HORIZONTAL_FOV_DEG = 95;
 const PLANET_ELEMENTS = {
   Mercury: { N: [48.3313, 3.24587e-5], i: [7.0047, 5.0e-8], w: [29.1241, 1.01444e-5], a: [0.387098, 0], e: [0.205635, 5.59e-10], M: [168.6562, 4.0923344368] },
   Venus: { N: [76.6799, 2.4659e-5], i: [3.3946, 2.75e-8], w: [54.8910, 1.38374e-5], a: [0.723330, 0], e: [0.006773, -1.302e-9], M: [48.0052, 1.6021302244] },
@@ -215,21 +214,6 @@ function skyViewUrl(raDeg, decDeg) {
   return `${SKYVIEW_ENDPOINT}?${params.toString()}`;
 }
 
-function projectToFrame(raDeg, decDeg, center = state.centerCoords) {
-  if (!center) return null;
-  const frame = $("skyOverlay");
-  const width = frame.width;
-  const height = frame.height;
-  const fov = Math.max(0.1, state.fov);
-  const dxDeg = signedDeltaDeg(raDeg, center.raDeg) * Math.cos(degToRad(center.decDeg));
-  const dyDeg = decDeg - center.decDeg;
-  const x = width / 2 + (dxDeg / fov) * width;
-  const y = height / 2 - (dyDeg / fov) * height;
-  const margin = 48;
-  if (x < -margin || x > width + margin || y < -margin || y > height + margin) return null;
-  return { x, y };
-}
-
 function sizeOverlayCanvas() {
   const canvas = $("skyOverlay");
   const rect = canvas.getBoundingClientRect();
@@ -242,177 +226,11 @@ function sizeOverlayCanvas() {
   }
 }
 
-function sizeCanvasToDisplay(canvas) {
-  const rect = canvas.getBoundingClientRect();
-  const ratio = window.devicePixelRatio || 1;
-  const width = Math.max(1, Math.round(rect.width * ratio));
-  const height = Math.max(1, Math.round(rect.height * ratio));
-  if (canvas.width !== width || canvas.height !== height) {
-    canvas.width = width;
-    canvas.height = height;
-  }
-}
-
-function projectAltAzToLiveFrame(azDeg, altDeg, canvas, { allowMargin = false } = {}) {
-  const horizontalFov = LIVE_VIEW_HORIZONTAL_FOV_DEG;
-  const verticalFov = horizontalFov * (canvas.height / canvas.width);
-  const dxDeg = signedDeltaDeg(azDeg, state.az) * Math.cos(degToRad(state.alt));
-  const dyDeg = altDeg - state.alt;
-  const x = canvas.width / 2 - (dxDeg / horizontalFov) * canvas.width;
-  const y = canvas.height / 2 - (dyDeg / verticalFov) * canvas.height;
-  const margin = allowMargin ? 40 * (window.devicePixelRatio || 1) : 0;
-  if (x < -margin || x > canvas.width + margin || y < -margin || y > canvas.height + margin) return null;
-  return { x, y, dxDeg, dyDeg };
-}
-
-function projectAltAzToLivePercent(azDeg, altDeg) {
-  const horizontalFov = LIVE_VIEW_HORIZONTAL_FOV_DEG;
-  const verticalFov = horizontalFov * 0.75;
-  const dxDeg = signedDeltaDeg(azDeg, state.az) * Math.cos(degToRad(state.alt));
-  const dyDeg = altDeg - state.alt;
-  return {
-    x: 50 - (dxDeg / horizontalFov) * 100,
-    y: 50 - (dyDeg / verticalFov) * 100,
-  };
-}
-
 function drawSkyOverlay() {
   sizeOverlayCanvas();
   const canvas = $("skyOverlay");
   const ctx = canvas.getContext("2d");
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  const showObjects = $("showObjects")?.checked;
-  const ratio = window.devicePixelRatio || 1;
-  ctx.lineWidth = 1.5 * ratio;
-  ctx.font = `${12 * ratio}px system-ui, sans-serif`;
-
-  if (showObjects) {
-    catalog.objects.forEach((object) => {
-      const objectCoords = objectEquatorial(object);
-      if (!objectCoords) return;
-      const altAz = equatorialToHorizontal({
-        raDeg: objectCoords.raDeg,
-        decDeg: objectCoords.decDeg,
-        latDeg: state.lat,
-        lonDeg: state.lon,
-      });
-      if (altAz.altDeg < 0) return;
-      const point = projectAltAzToLiveFrame(altAz.azDeg, altAz.altDeg, canvas);
-      if (!point) return;
-      const radius = object === state.target ? 16 * ratio : 8 * ratio;
-      ctx.strokeStyle = object === state.target ? "rgba(255, 202, 95, 0.98)" : "rgba(255, 202, 95, 0.78)";
-      ctx.fillStyle = ctx.strokeStyle;
-      ctx.beginPath();
-      ctx.arc(point.x, point.y, radius, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.fillText(object.id, point.x + radius + 5, point.y - radius);
-    });
-  }
-}
-
-function projectAltAzToMap(azDeg, altDeg, canvas) {
-  if (altDeg < 0) return null;
-  return {
-    x: (wrap360(azDeg) / 360) * canvas.width,
-    y: ((90 - Math.min(90, altDeg)) / 90) * canvas.height,
-  };
-}
-
-function drawWrappedLine(ctx, a, b, width) {
-  if (Math.abs(a.x - b.x) > width / 2) {
-    const left = a.x < b.x ? a : b;
-    const right = a.x < b.x ? b : a;
-    ctx.beginPath();
-    ctx.moveTo(0, right.y);
-    ctx.lineTo(left.x, left.y);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(right.x, right.y);
-    ctx.lineTo(width, left.y);
-    ctx.stroke();
-    return;
-  }
-  ctx.beginPath();
-  ctx.moveTo(a.x, a.y);
-  ctx.lineTo(b.x, b.y);
-  ctx.stroke();
-}
-
-function drawSkyMap() {
-  const canvas = $("skyMap");
-  if (!canvas) return;
-  sizeCanvasToDisplay(canvas);
-  const ctx = canvas.getContext("2d");
-  const ratio = window.devicePixelRatio || 1;
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  ctx.fillStyle = "#050608";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.strokeStyle = "rgba(152, 166, 175, 0.23)";
-  ctx.lineWidth = 1 * ratio;
-  [0.25, 0.5, 0.75].forEach((fraction) => {
-    const y = fraction * canvas.height;
-    ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.lineTo(canvas.width, y);
-    ctx.stroke();
-  });
-  [0, 90, 180, 270, 360].forEach((az) => {
-    const x = (az / 360) * canvas.width;
-    ctx.beginPath();
-    ctx.moveTo(x, 0);
-    ctx.lineTo(x, canvas.height);
-    ctx.stroke();
-  });
-
-  ctx.font = `${10 * ratio}px system-ui, sans-serif`;
-  ctx.fillStyle = "rgba(152, 166, 175, 0.8)";
-  [
-    ["N", 0.02],
-    ["E", 0.25],
-    ["S", 0.5],
-    ["W", 0.75],
-  ].forEach(([label, x]) => ctx.fillText(label, x * canvas.width, 12 * ratio));
-  ctx.fillText("Zenith", 8 * ratio, 28 * ratio);
-  ctx.fillText("Horizon", 8 * ratio, canvas.height - 8 * ratio);
-
-  if ($("showObjects")?.checked) {
-    catalog.objects.forEach((object) => {
-      const objectCoords = objectEquatorial(object);
-      if (!objectCoords) return;
-      const altAz = equatorialToHorizontal({
-        raDeg: objectCoords.raDeg,
-        decDeg: objectCoords.decDeg,
-        latDeg: state.lat,
-        lonDeg: state.lon,
-      });
-      const point = projectAltAzToMap(altAz.azDeg, altAz.altDeg, canvas);
-      if (!point) return;
-      ctx.strokeStyle = object === state.target ? "rgba(255, 202, 95, 1)" : "rgba(255, 202, 95, 0.6)";
-      ctx.fillStyle = ctx.strokeStyle;
-      ctx.beginPath();
-      ctx.arc(point.x, point.y, object === state.target ? 5 * ratio : 3 * ratio, 0, Math.PI * 2);
-      ctx.stroke();
-      if (object === state.target) ctx.fillText(object.id, point.x + 7 * ratio, point.y - 6 * ratio);
-    });
-  }
-
-  const current = projectAltAzToMap(state.az, state.alt, canvas);
-  if (current) {
-    ctx.strokeStyle = "rgba(104, 210, 198, 1)";
-    ctx.fillStyle = "rgba(104, 210, 198, 1)";
-    ctx.lineWidth = 2 * ratio;
-    ctx.beginPath();
-    ctx.arc(current.x, current.y, 7 * ratio, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(current.x - 10 * ratio, current.y);
-    ctx.lineTo(current.x + 10 * ratio, current.y);
-    ctx.moveTo(current.x, current.y - 10 * ratio);
-    ctx.lineTo(current.x, current.y + 10 * ratio);
-    ctx.stroke();
-  }
 }
 
 function syncInputsFromState() {
@@ -471,7 +289,6 @@ function updateGuide(coords) {
   const liveGuideText = $("liveGuideText");
   guideArrow.classList.remove("visible");
   liveGuideText.classList.remove("on-target");
-  $("targetDot").style.opacity = 0;
 
   if (!state.target) {
     $("guideValue").textContent = "No target";
@@ -529,18 +346,11 @@ function updateGuide(coords) {
     : `Move: ${deltaAz > 0 ? "right" : "left"} ${Math.abs(deltaAz).toFixed(1)} deg, ${deltaAlt > 0 ? "up" : "down"} ${Math.abs(deltaAlt).toFixed(1)} deg`;
 
   if (!isBelowHorizon && !isCentered) {
-    const arrowAngle = radToDeg(Math.atan2(-deltaAz, deltaAlt));
+    const screenDeltaAz = deltaAz * Math.cos(degToRad(state.alt));
+    const arrowAngle = radToDeg(Math.atan2(screenDeltaAz, deltaAlt));
     guideArrow.style.transform = `translate(-50%, -50%) rotate(${arrowAngle}deg)`;
     guideArrow.classList.add("visible");
   }
-
-  const dot = $("targetDot");
-  const livePoint = projectAltAzToLivePercent(targetAltAz.azDeg, targetAltAz.altDeg);
-  const x = livePoint.x;
-  const y = livePoint.y;
-  dot.style.left = `${Math.max(8, Math.min(92, x))}%`;
-  dot.style.top = `${Math.max(8, Math.min(92, y))}%`;
-  dot.style.opacity = isBelowHorizon ? 0 : 1;
   void coords;
 }
 
@@ -556,7 +366,6 @@ function solvePointing() {
   updateTelemetry(coords);
   updateGuide(coords);
   drawSkyOverlay();
-  drawSkyMap();
   return coords;
 }
 
@@ -806,12 +615,6 @@ function wireControls() {
   ["latitude", "longitude", "azimuth", "altitude", "fieldOfView", "survey"].forEach((id) => {
     $(id).addEventListener("input", solvePointing);
   });
-  ["showObjects"].forEach((id) => {
-    $(id).addEventListener("change", () => {
-      drawSkyOverlay();
-      drawSkyMap();
-    });
-  });
   ["targetCatalog", "targetType"].forEach((id) => {
     $(id).addEventListener("change", () => {
       populateTargetSelectors();
@@ -826,7 +629,6 @@ function wireControls() {
   $("targetSet").addEventListener("click", setTarget);
   window.addEventListener("resize", () => {
     drawSkyOverlay();
-    drawSkyMap();
   });
 }
 
