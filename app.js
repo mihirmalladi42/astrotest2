@@ -226,21 +226,56 @@ function sizeOverlayCanvas() {
   }
 }
 
+function horizontalDirectionVector({ azDeg, altDeg }) {
+  const az = degToRad(azDeg);
+  const alt = degToRad(altDeg);
+  const cosAlt = Math.cos(alt);
+  return {
+    east: cosAlt * Math.sin(az),
+    north: cosAlt * Math.cos(az),
+    up: Math.sin(alt),
+  };
+}
+
+function dotVector(a, b) {
+  return a.east * b.east + a.north * b.north + a.up * b.up;
+}
+
+function cameraBasis() {
+  const az = degToRad(state.az);
+  const alt = degToRad(state.alt);
+  return {
+    forward: horizontalDirectionVector({ azDeg: state.az, altDeg: state.alt }),
+    right: {
+      east: Math.cos(az),
+      north: -Math.sin(az),
+      up: 0,
+    },
+    viewUp: {
+      east: -Math.sin(alt) * Math.sin(az),
+      north: -Math.sin(alt) * Math.cos(az),
+      up: Math.cos(alt),
+    },
+  };
+}
 
 function targetScreenPosition(targetAltAz) {
+  sizeOverlayCanvas();
   const canvas = $("skyOverlay");
   const aspect = canvas.width / canvas.height;
   const verticalFov = Math.max(0.2, state.fov);
   const horizontalFov = verticalFov * aspect;
-  const deltaAz = signedDeltaDeg(targetAltAz.azDeg, state.az);
-  const deltaAlt = targetAltAz.altDeg - state.alt;
-  const screenDeltaAz = deltaAz * Math.cos(degToRad(state.alt));
+  const basis = cameraBasis();
+  const targetVector = horizontalDirectionVector(targetAltAz);
+  const forwardAmount = dotVector(targetVector, basis.forward);
+  const rightAngle = radToDeg(Math.atan2(dotVector(targetVector, basis.right), forwardAmount));
+  const upAngle = radToDeg(Math.atan2(dotVector(targetVector, basis.viewUp), forwardAmount));
 
   return {
-    x: canvas.width / 2 + (screenDeltaAz / horizontalFov) * canvas.width,
-    y: canvas.height / 2 - (deltaAlt / verticalFov) * canvas.height,
-    deltaAz,
-    deltaAlt,
+    x: canvas.width / 2 + (rightAngle / horizontalFov) * canvas.width,
+    y: canvas.height / 2 - (upAngle / verticalFov) * canvas.height,
+    rightAngle,
+    upAngle,
     horizontalFov,
     verticalFov,
   };
@@ -370,34 +405,40 @@ function updateGuide(coords) {
     latDeg: state.lat,
     lonDeg: state.lon,
   });
-  const deltaAz = signedDeltaDeg(targetAltAz.azDeg, state.az);
-  const deltaAlt = targetAltAz.altDeg - state.alt;
-  const screenDistance = Math.hypot(deltaAz * Math.cos(degToRad(state.alt)), deltaAlt);
+  const targetOffset = targetScreenPosition(targetAltAz);
+  const screenDistance = Math.hypot(targetOffset.rightAngle, targetOffset.upAngle);
   const centerThreshold = Math.max(2, state.fov * 0.5);
-  const isCentered = screenDistance <= centerThreshold;
+  const isBelowHorizon = targetAltAz.altDeg < 0;
+  const isCentered = !isBelowHorizon && screenDistance <= centerThreshold;
 
   const azThreshold = 0.7;
   const altThreshold = 0.7;
-  const azAction = deltaAz > azThreshold ? "right" : deltaAz < -azThreshold ? "left" : "center";
-  const altAction = deltaAlt > altThreshold ? "up" : deltaAlt < -altThreshold ? "down" : "center";
-  const horizontalText = azAction === "center" ? "" : `${azAction} ${Math.abs(deltaAz).toFixed(1)}°`;
-  const verticalText = altAction === "center" ? "" : `${altAction} ${Math.abs(deltaAlt).toFixed(1)}°`;
+  const azAction = targetOffset.rightAngle > azThreshold ? "right" : targetOffset.rightAngle < -azThreshold ? "left" : "center";
+  const altAction = targetOffset.upAngle > altThreshold ? "up" : targetOffset.upAngle < -altThreshold ? "down" : "center";
+  const horizontalText = azAction === "center" ? "" : `${azAction} ${Math.abs(targetOffset.rightAngle).toFixed(1)}°`;
+  const verticalText = altAction === "center" ? "" : `${altAction} ${Math.abs(targetOffset.upAngle).toFixed(1)}°`;
   const moveText = [horizontalText, verticalText].filter(Boolean).join(" / ") || "centered";
 
   $("guideValue").textContent = `${state.target.id}: ${screenDistance.toFixed(1)} deg away`;
-  $("guideHint").textContent = isCentered
+  $("guideHint").textContent = isBelowHorizon
+    ? "Target is below the horizon from this location right now."
+    : isCentered
     ? "Target centered. Resolve sky for detail."
     : "Align the reticle with the target frame.";
-  $("targetLock").textContent = isCentered
+  $("targetLock").textContent = isBelowHorizon
+    ? `${state.target.id} is below the horizon`
+    : isCentered
     ? `ON TARGET: ${state.target.id}`
     : `Guide to ${state.target.id}: ${moveText}`;
   $("targetLock").classList.toggle("on-target", isCentered);
   liveGuideText.classList.toggle("on-target", isCentered);
-  liveGuideText.textContent = isCentered
+  liveGuideText.textContent = isBelowHorizon
+    ? `${state.target.id} BELOW HORIZON`
+    : isCentered
     ? `ON TARGET ${state.target.id}`
     : `MOVE ${moveText.toUpperCase()}`;
   $("targetAltAz").textContent = `Target: Alt ${angleDegToDms(targetAltAz.altDeg, { signed: true })}, Az ${angleDegToDms(targetAltAz.azDeg)}`;
-  $("deltaAltAz").textContent = isCentered ? "Move: centered" : `Move: ${moveText}`;
+  $("deltaAltAz").textContent = isBelowHorizon ? "Move: target below horizon" : isCentered ? "Move: centered" : `Move: ${moveText}`;
   void coords;
 }
 
