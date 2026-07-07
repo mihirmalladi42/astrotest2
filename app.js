@@ -265,7 +265,7 @@ function targetScreenPosition(targetAltAz) {
   const horizontalFov = verticalFov * aspect;
   const deltaAz = stableGuideAzDelta(signedDeltaDeg(targetAltAz.azDeg, state.az), state.target?.id);
   const deltaAlt = targetAltAz.altDeg - state.alt;
-  const rightAngle = deltaAz * Math.cos(degToRad(state.alt));
+  const rightAngle = -deltaAz * Math.cos(degToRad(state.alt));
   const upAngle = deltaAlt;
 
   return {
