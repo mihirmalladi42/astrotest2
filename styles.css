@@ -175,35 +175,22 @@ video {
   z-index: 5;
   display: grid;
   place-items: center;
-  width: 46px;
-  height: 46px;
+  left: calc(50% + 66px);
+  top: 50%;
+  width: 42px;
+  height: 42px;
   color: var(--accent-strong);
-  font-size: 30px;
+  font-size: 32px;
   opacity: 0;
-  transform: translate(-50%, -50%);
+  transform: translate(-50%, -50%) rotate(0deg);
+  transform-origin: 50% 50%;
   text-shadow: 0 1px 8px #000;
-  transition: opacity 160ms ease;
+  transition: opacity 160ms ease, transform 160ms ease;
   pointer-events: none;
 }
 
-.guide-arrow.up {
-  left: 50%;
-  top: 15%;
-}
-
-.guide-arrow.right {
-  left: 85%;
-  top: 50%;
-}
-
-.guide-arrow.down {
-  left: 50%;
-  top: 85%;
-}
-
-.guide-arrow.left {
-  left: 15%;
-  top: 50%;
+.guide-arrow.visible {
+  opacity: 1;
 }
 
 .panel {
@@ -262,6 +249,80 @@ p {
 .target-status {
   min-height: 20px;
   font-size: 13px;
+}
+
+.target-lock {
+  min-height: 44px;
+  display: grid;
+  place-items: center;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #0d1014;
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+.target-lock.on-target {
+  border-color: rgba(104, 210, 198, 0.75);
+  color: var(--text);
+  background: rgba(104, 210, 198, 0.13);
+}
+
+.guide-metrics {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.sky-map-wrap {
+  display: grid;
+  gap: 8px;
+}
+
+#skyMap {
+  width: 100%;
+  aspect-ratio: 2 / 1;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #050608;
+}
+
+.sky-map-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.sky-map-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.sky-map-legend i {
+  width: 8px;
+  height: 8px;
+  display: inline-block;
+  border-radius: 50%;
+}
+
+.legend-current {
+  background: var(--accent);
+}
+
+.legend-target {
+  background: var(--accent-strong);
+}
+
+.legend-object {
+  border: 1px solid var(--accent-strong);
 }
 
 .toggles {

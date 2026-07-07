@@ -168,6 +168,17 @@ function sizeOverlayCanvas() {
   }
 }
 
+function sizeCanvasToDisplay(canvas) {
+  const rect = canvas.getBoundingClientRect();
+  const ratio = window.devicePixelRatio || 1;
+  const width = Math.max(1, Math.round(rect.width * ratio));
+  const height = Math.max(1, Math.round(rect.height * ratio));
+  if (canvas.width !== width || canvas.height !== height) {
+    canvas.width = width;
+    canvas.height = height;
+  }
+}
+
 function drawSkyOverlay() {
   sizeOverlayCanvas();
   const canvas = $("skyOverlay");
@@ -216,6 +227,134 @@ function drawSkyOverlay() {
       ctx.stroke();
       ctx.fillText(object.id, point.x + radius + 5, point.y - radius);
     });
+  }
+}
+
+function projectAltAzToMap(azDeg, altDeg, canvas) {
+  if (altDeg < 0) return null;
+  return {
+    x: (wrap360(azDeg) / 360) * canvas.width,
+    y: ((90 - Math.min(90, altDeg)) / 90) * canvas.height,
+  };
+}
+
+function drawWrappedLine(ctx, a, b, width) {
+  if (Math.abs(a.x - b.x) > width / 2) {
+    const left = a.x < b.x ? a : b;
+    const right = a.x < b.x ? b : a;
+    ctx.beginPath();
+    ctx.moveTo(0, right.y);
+    ctx.lineTo(left.x, left.y);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(right.x, right.y);
+    ctx.lineTo(width, left.y);
+    ctx.stroke();
+    return;
+  }
+  ctx.beginPath();
+  ctx.moveTo(a.x, a.y);
+  ctx.lineTo(b.x, b.y);
+  ctx.stroke();
+}
+
+function drawSkyMap() {
+  const canvas = $("skyMap");
+  if (!canvas) return;
+  sizeCanvasToDisplay(canvas);
+  const ctx = canvas.getContext("2d");
+  const ratio = window.devicePixelRatio || 1;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  ctx.fillStyle = "#050608";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.strokeStyle = "rgba(152, 166, 175, 0.23)";
+  ctx.lineWidth = 1 * ratio;
+  [0.25, 0.5, 0.75].forEach((fraction) => {
+    const y = fraction * canvas.height;
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(canvas.width, y);
+    ctx.stroke();
+  });
+  [0, 90, 180, 270, 360].forEach((az) => {
+    const x = (az / 360) * canvas.width;
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, canvas.height);
+    ctx.stroke();
+  });
+
+  ctx.font = `${10 * ratio}px system-ui, sans-serif`;
+  ctx.fillStyle = "rgba(152, 166, 175, 0.8)";
+  [
+    ["N", 0.02],
+    ["E", 0.25],
+    ["S", 0.5],
+    ["W", 0.75],
+  ].forEach(([label, x]) => ctx.fillText(label, x * canvas.width, 12 * ratio));
+  ctx.fillText("Zenith", 8 * ratio, 28 * ratio);
+  ctx.fillText("Horizon", 8 * ratio, canvas.height - 8 * ratio);
+
+  if ($("showConstellations")?.checked) {
+    ctx.strokeStyle = "rgba(104, 210, 198, 0.5)";
+    ctx.fillStyle = "rgba(104, 210, 198, 0.72)";
+    catalog.constellations.forEach((constellation) => {
+      let labelPoint = null;
+      const starPositions = {};
+      Object.entries(constellation.stars).forEach(([name, star]) => {
+        const altAz = equatorialToHorizontal({
+          raDeg: star[0],
+          decDeg: star[1],
+          latDeg: state.lat,
+          lonDeg: state.lon,
+        });
+        starPositions[name] = projectAltAzToMap(altAz.azDeg, altAz.altDeg, canvas);
+      });
+      constellation.lines.forEach(([from, to]) => {
+        const a = starPositions[from];
+        const b = starPositions[to];
+        if (!a || !b) return;
+        drawWrappedLine(ctx, a, b, canvas.width);
+        labelPoint = labelPoint || a;
+      });
+      if (labelPoint) ctx.fillText(constellation.name, labelPoint.x + 5 * ratio, labelPoint.y - 5 * ratio);
+    });
+  }
+
+  if ($("showObjects")?.checked) {
+    catalog.objects.forEach((object) => {
+      const altAz = equatorialToHorizontal({
+        raDeg: object.ra,
+        decDeg: object.dec,
+        latDeg: state.lat,
+        lonDeg: state.lon,
+      });
+      const point = projectAltAzToMap(altAz.azDeg, altAz.altDeg, canvas);
+      if (!point) return;
+      ctx.strokeStyle = object === state.target ? "rgba(255, 202, 95, 1)" : "rgba(255, 202, 95, 0.6)";
+      ctx.fillStyle = ctx.strokeStyle;
+      ctx.beginPath();
+      ctx.arc(point.x, point.y, object === state.target ? 5 * ratio : 3 * ratio, 0, Math.PI * 2);
+      ctx.stroke();
+      if (object === state.target) ctx.fillText(object.id, point.x + 7 * ratio, point.y - 6 * ratio);
+    });
+  }
+
+  const current = projectAltAzToMap(state.az, state.alt, canvas);
+  if (current) {
+    ctx.strokeStyle = "rgba(104, 210, 198, 1)";
+    ctx.fillStyle = "rgba(104, 210, 198, 1)";
+    ctx.lineWidth = 2 * ratio;
+    ctx.beginPath();
+    ctx.arc(current.x, current.y, 7 * ratio, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(current.x - 10 * ratio, current.y);
+    ctx.lineTo(current.x + 10 * ratio, current.y);
+    ctx.moveTo(current.x, current.y - 10 * ratio);
+    ctx.lineTo(current.x, current.y + 10 * ratio);
+    ctx.stroke();
   }
 }
 
@@ -271,20 +410,17 @@ function updateCaptureMetadata(coords, capturedAt = new Date()) {
 }
 
 function updateGuide(coords) {
-  const arrows = {
-    up: $("guideUp"),
-    right: $("guideRight"),
-    down: $("guideDown"),
-    left: $("guideLeft"),
-  };
-  Object.values(arrows).forEach((arrow) => {
-    arrow.style.opacity = 0;
-  });
+  const guideArrow = $("guideArrow");
+  guideArrow.classList.remove("visible");
   $("targetDot").style.opacity = 0;
 
   if (!state.target) {
     $("guideValue").textContent = "No target";
     $("guideHint").textContent = "Search for a target.";
+    $("targetLock").textContent = "Search for a target to start guidance.";
+    $("targetLock").classList.remove("on-target");
+    $("targetAltAz").textContent = "Target: --";
+    $("deltaAltAz").textContent = "Move: --";
     return;
   }
 
@@ -297,19 +433,32 @@ function updateGuide(coords) {
   const deltaAz = signedDeltaDeg(targetAltAz.azDeg, state.az);
   const deltaAlt = targetAltAz.altDeg - state.alt;
   const distance = Math.hypot(deltaAz * Math.cos(degToRad(state.alt)), deltaAlt);
-  const centerThreshold = Math.max(0.4, state.fov * 0.14);
+  const centerThreshold = Math.max(2, state.fov * 0.5);
+  const isCentered = distance <= centerThreshold;
+  const isBelowHorizon = targetAltAz.altDeg < 0;
 
   $("guideValue").textContent = `${state.target.id}: ${distance.toFixed(1)} deg away`;
   $("guideHint").textContent =
-    distance <= centerThreshold
+    isCentered
       ? "Target centered. Resolve sky for detail."
+      : isBelowHorizon
+      ? "Target is below the horizon from this location right now."
       : `${deltaAz > 0 ? "Turn right" : "Turn left"} ${Math.abs(deltaAz).toFixed(1)} deg, ${deltaAlt > 0 ? "tilt up" : "tilt down"} ${Math.abs(deltaAlt).toFixed(1)} deg`;
+  $("targetLock").textContent = isCentered
+    ? `ON TARGET: ${state.target.id}`
+    : isBelowHorizon
+    ? `${state.target.id} is below the horizon`
+    : `Guide to ${state.target.id}: ${deltaAz > 0 ? "turn right" : "turn left"}, ${deltaAlt > 0 ? "tilt up" : "tilt down"}`;
+  $("targetLock").classList.toggle("on-target", isCentered);
+  $("targetAltAz").textContent = `Target: Alt ${angleDegToDms(targetAltAz.altDeg, { signed: true })}, Az ${angleDegToDms(targetAltAz.azDeg)}`;
+  $("deltaAltAz").textContent = isCentered
+    ? "Move: centered"
+    : `Move: ${deltaAz > 0 ? "right" : "left"} ${Math.abs(deltaAz).toFixed(1)} deg, ${deltaAlt > 0 ? "up" : "down"} ${Math.abs(deltaAlt).toFixed(1)} deg`;
 
-  if (Math.abs(deltaAlt) > centerThreshold) {
-    (deltaAlt > 0 ? arrows.up : arrows.down).style.opacity = 1;
-  }
-  if (Math.abs(deltaAz) > centerThreshold) {
-    (deltaAz > 0 ? arrows.right : arrows.left).style.opacity = 1;
+  if (!isBelowHorizon && !isCentered) {
+    const arrowAngle = radToDeg(Math.atan2(deltaAz, deltaAlt));
+    guideArrow.style.transform = `translate(-50%, -50%) rotate(${arrowAngle}deg)`;
+    guideArrow.classList.add("visible");
   }
 
   const dot = $("targetDot");
@@ -318,7 +467,7 @@ function updateGuide(coords) {
   const y = 50 - (deltaAlt / Math.max(state.fov, 1)) * 35;
   dot.style.left = `${Math.max(8, Math.min(92, x))}%`;
   dot.style.top = `${Math.max(8, Math.min(92, y))}%`;
-  dot.style.opacity = 1;
+  dot.style.opacity = isBelowHorizon ? 0 : 1;
   frame.dataset.targetDistance = String(distance);
   void coords;
 }
@@ -335,6 +484,7 @@ function solvePointing() {
   updateTelemetry(coords);
   updateGuide(coords);
   drawSkyOverlay();
+  drawSkyMap();
   return coords;
 }
 
@@ -548,7 +698,10 @@ function wireControls() {
     $(id).addEventListener("input", solvePointing);
   });
   ["showObjects", "showConstellations"].forEach((id) => {
-    $(id).addEventListener("change", drawSkyOverlay);
+    $(id).addEventListener("change", () => {
+      drawSkyOverlay();
+      drawSkyMap();
+    });
   });
   $("capture").addEventListener("click", captureSky);
   $("location").addEventListener("click", useLocation);
@@ -558,7 +711,10 @@ function wireControls() {
   $("targetSearch").addEventListener("keydown", (event) => {
     if (event.key === "Enter") setTarget();
   });
-  window.addEventListener("resize", drawSkyOverlay);
+  window.addEventListener("resize", () => {
+    drawSkyOverlay();
+    drawSkyMap();
+  });
 }
 
 syncInputsFromState();

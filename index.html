@@ -15,12 +15,7 @@
           <canvas id="skyOverlay" aria-hidden="true"></canvas>
           <div class="reticle" aria-hidden="true"></div>
           <div class="target-dot" id="targetDot" aria-hidden="true"></div>
-          <div class="guide-arrows" aria-hidden="true">
-            <span id="guideUp" class="guide-arrow up">▲</span>
-            <span id="guideRight" class="guide-arrow right">▶</span>
-            <span id="guideDown" class="guide-arrow down">▼</span>
-            <span id="guideLeft" class="guide-arrow left">◀</span>
-          </div>
+          <div id="guideArrow" class="guide-arrow" aria-hidden="true">▲</div>
           <div class="hud">
             <span id="cameraStatus">Camera off</span>
             <span class="hud-coordinates">
@@ -56,6 +51,19 @@
           </label>
           <button id="targetSet" type="button">Set Target</button>
           <p id="targetStatus" class="target-status">No target selected.</p>
+          <div id="targetLock" class="target-lock">Search for a target to start guidance.</div>
+          <div class="guide-metrics">
+            <span id="targetAltAz">Target: --</span>
+            <span id="deltaAltAz">Move: --</span>
+          </div>
+          <div class="sky-map-wrap">
+            <canvas id="skyMap" aria-label="Visible sky map with constellations and target markers"></canvas>
+            <div class="sky-map-legend">
+              <span><i class="legend-current"></i>Current</span>
+              <span><i class="legend-target"></i>Target</span>
+              <span><i class="legend-object"></i>Objects</span>
+            </div>
+          </div>
           <div class="toggles">
             <label><input id="showObjects" type="checkbox" checked /> Deep-sky circles</label>
             <label><input id="showConstellations" type="checkbox" checked /> Constellations</label>
