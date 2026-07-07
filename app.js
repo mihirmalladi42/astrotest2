@@ -288,6 +288,7 @@ function updateGuide(coords) {
   const guideArrow = $("guideArrow");
   const liveGuideText = $("liveGuideText");
   guideArrow.classList.remove("visible");
+  guideArrow.classList.remove("on-target");
   liveGuideText.classList.remove("on-target");
 
   if (!state.target) {
@@ -348,8 +349,16 @@ function updateGuide(coords) {
   if (!isBelowHorizon && !isCentered) {
     const screenDeltaAz = deltaAz * Math.cos(degToRad(state.alt));
     const arrowAngle = radToDeg(Math.atan2(screenDeltaAz, deltaAlt));
-    guideArrow.style.transform = `translate(-50%, -50%) rotate(${arrowAngle}deg)`;
+    guideArrow.textContent = "▲";
+    guideArrow.style.transform = `rotate(${arrowAngle}deg)`;
     guideArrow.classList.add("visible");
+  } else if (isCentered) {
+    guideArrow.textContent = "◎";
+    guideArrow.style.transform = "rotate(0deg)";
+    guideArrow.classList.add("visible", "on-target");
+  } else {
+    guideArrow.textContent = "▲";
+    guideArrow.style.transform = "rotate(0deg)";
   }
   void coords;
 }

@@ -160,22 +160,50 @@ video {
   z-index: 5;
   display: grid;
   place-items: center;
-  left: 50%;
-  top: 50%;
-  width: 54px;
-  height: 54px;
+  right: 16px;
+  top: 16px;
+  width: 62px;
+  height: 62px;
+  border: 1px solid rgba(255, 202, 95, 0.7);
+  border-radius: 50%;
+  background: rgba(8, 10, 13, 0.74);
   color: var(--accent-strong);
-  font-size: 42px;
+  font-size: 38px;
+  line-height: 1;
   opacity: 0;
-  transform: translate(-50%, -50%) rotate(0deg);
+  transform: rotate(0deg);
   transform-origin: 50% 50%;
-  text-shadow: 0 2px 10px #000;
-  transition: opacity 160ms ease, transform 160ms ease;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35), inset 0 0 18px rgba(255, 202, 95, 0.1);
+  text-shadow: 0 2px 9px #000;
+  transition: opacity 160ms ease, transform 160ms ease, border-color 160ms ease, color 160ms ease;
   pointer-events: none;
+}
+
+.guide-arrow::before,
+.guide-arrow::after {
+  content: "";
+  position: absolute;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.32);
+}
+
+.guide-arrow::before {
+  width: 1px;
+  height: 48px;
+}
+
+.guide-arrow::after {
+  width: 48px;
+  height: 1px;
 }
 
 .guide-arrow.visible {
   opacity: 1;
+}
+
+.guide-arrow.on-target {
+  border-color: rgba(104, 210, 198, 0.8);
+  color: var(--accent);
 }
 
 .live-guide-text {
