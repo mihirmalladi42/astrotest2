@@ -347,7 +347,7 @@ function updateGuide(coords) {
     ? "Move: centered"
     : `Move: ${deltaAz > 0 ? "right" : "left"} ${Math.abs(deltaAz).toFixed(1)} deg, ${deltaAlt > 0 ? "up" : "down"} ${Math.abs(deltaAlt).toFixed(1)} deg`;
 
-  if (!isBelowHorizon && !isCentered) {
+  if (!isCentered) {
     const screenDeltaAz = deltaAz * Math.cos(degToRad(state.alt));
     const arrowAngle = radToDeg(Math.atan2(screenDeltaAz, deltaAlt));
     guideArrow.textContent = "▲";
