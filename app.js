@@ -238,14 +238,9 @@ function stableGuideAzDelta(rawDeltaAz, targetId) {
 
   const rawDirection = signOrZero(rawDeltaAz);
   const absDelta = Math.abs(rawDeltaAz);
-  const lockThreshold = 135;
-  const releaseThreshold = 105;
+  const releaseThreshold = 18;
 
-  if (absDelta >= lockThreshold && state.guideAzDirection !== 0) {
-    return state.guideAzDirection * absDelta;
-  }
-
-  if (absDelta <= releaseThreshold || state.guideAzDirection === 0) {
+  if (state.guideAzDirection === 0 || absDelta <= releaseThreshold) {
     state.guideAzDirection = rawDirection;
     return rawDeltaAz;
   }
