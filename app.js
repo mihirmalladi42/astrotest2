@@ -244,6 +244,7 @@ function updateTelemetry(coords) {
   $("decDms").textContent = decDegToDms(coords.decDeg);
   $("lstValue").textContent = `${coords.lstDeg.toFixed(3)} deg`;
   $("pointingValue").textContent = `Az ${angleDegToDms(state.az)}, Alt ${angleDegToDms(state.alt, { signed: true })}`;
+  $("liveEquatorialValue").textContent = `RA ${raDegToHms(coords.raDeg)}, Dec ${decDegToDms(coords.decDeg)}`;
 }
 
 function showCaptureToast(coords) {

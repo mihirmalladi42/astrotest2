@@ -116,10 +116,17 @@ video {
   bottom: 16px;
   display: flex;
   justify-content: space-between;
+  align-items: flex-end;
   gap: 12px;
   color: var(--text);
   font-size: 13px;
   text-shadow: 0 1px 2px #000;
+}
+
+.hud-coordinates {
+  display: grid;
+  gap: 3px;
+  text-align: right;
 }
 
 .capture-toast {
